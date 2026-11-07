@@ -18,13 +18,22 @@ export function encryptProviderCredential(credential: string) {
   const cipher = createCipheriv(ALGORITHM, encryptionKey(), iv);
   const ciphertext = Buffer.concat([cipher.update(credential, "utf8"), cipher.final()]);
   const tag = cipher.getAuthTag();
-  return [VERSION, iv.toString("base64url"), tag.toString("base64url"), ciphertext.toString("base64url")].join(".");
+  return [
+    VERSION,
+    iv.toString("base64url"),
+    tag.toString("base64url"),
+    ciphertext.toString("base64url"),
+  ].join(".");
 }
 
 export function decryptProviderCredential(envelope: string) {
   const [version, iv, tag, ciphertext, extra] = envelope.split(".");
-  if (version !== VERSION || !iv || !tag || !ciphertext || extra) throw new Error("Invalid credential envelope");
+  if (version !== VERSION || !iv || !tag || !ciphertext || extra)
+    throw new Error("Invalid credential envelope");
   const decipher = createDecipheriv(ALGORITHM, encryptionKey(), Buffer.from(iv, "base64url"));
   decipher.setAuthTag(Buffer.from(tag, "base64url"));
-  return Buffer.concat([decipher.update(Buffer.from(ciphertext, "base64url")), decipher.final()]).toString("utf8");
+  return Buffer.concat([
+    decipher.update(Buffer.from(ciphertext, "base64url")),
+    decipher.final(),
+  ]).toString("utf8");
 }

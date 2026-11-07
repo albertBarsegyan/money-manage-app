@@ -5,7 +5,8 @@ export class IntegrationManager {
   private readonly adapters = new Map<string, ProviderAdapter>();
 
   register(adapter: ProviderAdapter) {
-    if (this.adapters.has(adapter.descriptor.id)) throw new Error(`Provider already registered: ${adapter.descriptor.id}`);
+    if (this.adapters.has(adapter.descriptor.id))
+      throw new Error(`Provider already registered: ${adapter.descriptor.id}`);
     this.adapters.set(adapter.descriptor.id, adapter);
   }
 
@@ -15,5 +16,7 @@ export class IntegrationManager {
     return adapter;
   }
 
-  listImplemented() { return [...this.adapters.values()].map(adapter => adapter.descriptor); }
+  listImplemented() {
+    return [...this.adapters.values()].map((adapter) => adapter.descriptor);
+  }
 }

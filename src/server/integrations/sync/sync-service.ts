@@ -1,6 +1,14 @@
-import type { IntegrationStore, NormalizedTransaction, ProviderAdapter, TransactionReviewStatus } from "../core/integration.types";
+import type {
+  IntegrationStore,
+  NormalizedTransaction,
+  ProviderAdapter,
+  TransactionReviewStatus,
+} from "../core/integration.types";
 
-export interface SyncOptions { autoConfirmTrustedTransactions?: boolean; maxPages?: number; }
+export interface SyncOptions {
+  autoConfirmTrustedTransactions?: boolean;
+  maxPages?: number;
+}
 
 /** Import one account incrementally; provider IDs are authoritative, fingerprints always need human review. */
 export async function syncAccount(input: {
@@ -22,9 +30,16 @@ export async function syncAccount(input: {
       const page = await adapter.listTransactions({ credential, accountExternalId, cursor });
       for (const transaction of page.transactions) {
         if (!isValid(transaction, accountExternalId)) continue;
-        if (await store.hasExternalTransaction(userId, adapter.descriptor.id, transaction.externalId)) continue;
+        if (
+          await store.hasExternalTransaction(userId, adapter.descriptor.id, transaction.externalId)
+        )
+          continue;
         const likelyDuplicate = await store.findLikelyDuplicate(userId, transaction);
-        const review: TransactionReviewStatus = chooseReviewStatus(transaction, likelyDuplicate, input.options);
+        const review: TransactionReviewStatus = chooseReviewStatus(
+          transaction,
+          likelyDuplicate,
+          input.options,
+        );
         await store.saveTransaction(userId, integrationId, transaction, review);
         imported++;
       }
@@ -36,21 +51,41 @@ export async function syncAccount(input: {
     await store.recordSyncEvent({ userId, integrationId, outcome: "SUCCEEDED", imported });
     return { imported, cursor };
   } catch (error) {
-    await store.recordSyncEvent({ userId, integrationId, outcome: "FAILED", imported, errorCode: safeErrorCode(error) });
+    await store.recordSyncEvent({
+      userId,
+      integrationId,
+      outcome: "FAILED",
+      imported,
+      errorCode: safeErrorCode(error),
+    });
     throw error;
   }
 }
 
 function isValid(tx: NormalizedTransaction, accountExternalId: string) {
-  return tx.accountExternalId === accountExternalId && Boolean(tx.externalId) && Boolean(tx.currency) && Number.isFinite(tx.amount) && tx.amount >= 0 && Boolean(tx.description);
+  return (
+    tx.accountExternalId === accountExternalId &&
+    Boolean(tx.externalId) &&
+    Boolean(tx.currency) &&
+    Number.isFinite(tx.amount) &&
+    tx.amount >= 0 &&
+    Boolean(tx.description)
+  );
 }
 
-function chooseReviewStatus(tx: NormalizedTransaction, likelyDuplicate: boolean, options?: SyncOptions): TransactionReviewStatus {
-  if (likelyDuplicate || tx.type === "UNKNOWN" || tx.type === "TRANSFER" || tx.isOwnAccountTransfer) return "PENDING_REVIEW";
+function chooseReviewStatus(
+  tx: NormalizedTransaction,
+  likelyDuplicate: boolean,
+  options?: SyncOptions,
+): TransactionReviewStatus {
+  if (likelyDuplicate || tx.type === "UNKNOWN" || tx.type === "TRANSFER" || tx.isOwnAccountTransfer)
+    return "PENDING_REVIEW";
   if (options?.autoConfirmTrustedTransactions && tx.status === "BOOKED") return "CONFIRMED";
   return "PENDING_REVIEW";
 }
 
 function safeErrorCode(error: unknown) {
-  return error instanceof Error ? error.message.replace(/[^A-Z0-9_:-]/gi, "_").slice(0, 80) : "UNKNOWN_SYNC_ERROR";
+  return error instanceof Error
+    ? error.message.replace(/[^A-Z0-9_:-]/gi, "_").slice(0, 80)
+    : "UNKNOWN_SYNC_ERROR";
 }

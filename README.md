@@ -1,36 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Finora
 
-## Getting Started
+Finora is a local-first personal finance calculator. The active storage mode is **Local-only**: financial records are stored locally in IndexedDB in the current browser profile. There is no sign-in, cloud sync, or financial API connection in this build.
 
-First, run the development server:
+## Run locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open the local address printed by Next.js. Income, expenses, accounts, salary periods, CSV review candidates, and calculations work without connecting a financial service. Entered amounts use integer minor units, and calculations keep currencies separate rather than applying an undisclosed exchange rate.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+For step-by-step instructions, see the [Finora user guide](USER_GUIDE.md).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Use **Settings → Data & Privacy → Clear Local Data** to permanently clear Finora records from this browser. Reloading the app restores saved records from IndexedDB.
 
-## Learn More
+## Architecture
 
-To learn more about Next.js, take a look at the following resources:
+- `src/entities/finance` contains typed financial records, validation, exact decimal parsing, CSV preview, storage-independent calculations, and the finance storage adapters.
+- `src/entities/finance/storage/contracts` defines the provider contract. The IndexedDB provider persists the active Local-only mode; the memory provider is its in-memory validation and snapshot cache.
+- `src/entities/finance/storage/providers/planned-storage.provider.ts` marks Private Cloud and Custom Database as unavailable. They cannot be selected or used to migrate data.
+- `src/entities/finance/storage/storage-manager.ts` owns provider selection and rejects unavailable modes.
+- `src/features/finance-session` exposes finance data through an application context; UI components do not choose storage providers. IndexedDB hydrates once, maintains a memory cache for synchronous calculations, and serializes atomic snapshots through a write queue.
+- `src/routes` contains generated TanStack Router file routes. `src/app` hosts Next.js and mounts the client router through an optional catch-all route.
+- `src/features/manage-*` owns the four finance forms and Zod schemas. `src/shared/ui` contains shadcn primitives and accessible form/dialog wrappers.
+- `src/server/integrations` contains isolated future integration/security primitives. No route, provider connection, credentials, webhook, or sync job is active in the application.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+There is no automatic backup. Versioned export/import and migration preview are future work. Android notification access is not requested or implemented in this web build.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Checks
 
-## Deploy on Vercel
+```bash
+npm test
+npm run typecheck
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The optimized Next.js build can also be run with `npm run build`. In restricted environments, Turbopack may require worker process permissions to build CSS.

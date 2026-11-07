@@ -4,7 +4,7 @@ import { isIsoDate, parseMoney } from "@/entities/finance";
 export const incomeSchema = z
   .object({
     source: z.enum(["SALARY", "FREELANCE", "BUSINESS", "BONUS", "OTHER"]),
-    description: z.string().trim().min(1, "Enter an income description."),
+    description: z.string().trim(),
     amount: z.string().trim().min(1, "Enter an amount."),
     currency: z.enum(["AMD", "USD", "EUR", "GBP"]),
     receivedOn: z.string(),

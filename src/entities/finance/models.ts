@@ -8,6 +8,7 @@ export type TransactionSource =
   "MANUAL" | "BANK_SYNC" | "WALLET_SYNC" | "CSV_IMPORT" | "PAYMENT_PROVIDER";
 export type TransactionReviewStatus = "PENDING_REVIEW" | "CONFIRMED" | "REJECTED";
 export type AccountType = "CASH" | "CHECKING" | "SAVINGS" | "CREDIT" | "OTHER";
+export type ExpenseBudgetMode = "DAILY" | "GLOBAL";
 
 /** Money is stored as integer minor units (for example cents), never binary floating point. */
 export interface Money {
@@ -42,6 +43,7 @@ export interface ExpenseRecord {
   type: TransactionType;
   source: TransactionSource;
   reviewStatus: TransactionReviewStatus;
+  budgetMode?: ExpenseBudgetMode;
   salaryPeriodId?: string;
   destinationAccountId?: string;
   externalReference?: string;

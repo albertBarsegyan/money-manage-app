@@ -11,6 +11,7 @@ import {
   previewCsvImport,
   type AccountRecord,
   type ExpenseRecord,
+  type ExpenseBudgetMode,
   type IncomeRecord,
   type SalaryPeriod,
 } from "@/entities/finance";
@@ -31,6 +32,7 @@ import { AccountsPage } from "./accounts-page";
 import { AnalyticsPage } from "./analytics-page";
 import { IntegrationsPage } from "./integrations-page";
 import { SettingsPage } from "./settings-page";
+import { SalaryPeriodsPage } from "./salary-periods-page";
 
 type Dialog = "income" | "expense" | "account" | "salary" | null;
 const viewPaths = {
@@ -38,6 +40,7 @@ const viewPaths = {
   Transactions: "/transactions",
   Income: "/income",
   Accounts: "/accounts",
+  "Salary periods": "/salary-periods",
   Analytics: "/analytics",
   Integrations: "/integrations",
   Settings: "/settings",
@@ -51,6 +54,8 @@ function viewForPath(pathname: string): View {
       return "Income";
     case "/accounts":
       return "Accounts";
+    case "/salary-periods":
+      return "Salary periods";
     case "/analytics":
       return "Analytics";
     case "/integrations":
@@ -90,6 +95,7 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [editingIncome, setEditingIncome] = useState<IncomeRecord | undefined>();
   const [editingExpense, setEditingExpense] = useState<ExpenseRecord | undefined>();
+  const [expenseBudgetMode, setExpenseBudgetMode] = useState<ExpenseBudgetMode>("GLOBAL");
   const [editingAccount, setEditingAccount] = useState<AccountRecord | undefined>();
   const [editingSalary, setEditingSalary] = useState<SalaryPeriod | undefined>();
   const query = routeSearch.get("q") ?? "";
@@ -135,8 +141,9 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
     setDialog("income");
     setError("");
   };
-  const openExpense = (item?: ExpenseRecord) => {
+  const openExpense = (item?: ExpenseRecord, budgetMode?: ExpenseBudgetMode) => {
     setEditingExpense(item);
+    setExpenseBudgetMode(item?.budgetMode ?? budgetMode ?? "GLOBAL");
     setDialog("expense");
     setError("");
   };
@@ -194,6 +201,7 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
     ["Transactions", "arrows", viewPaths.Transactions],
     ["Income", "chart", viewPaths.Income],
     ["Accounts", "wallet", viewPaths.Accounts],
+    ["Salary periods", "chart", viewPaths["Salary periods"]],
     ["Analytics", "chart", viewPaths.Analytics],
     ["Integrations", "bank", viewPaths.Integrations],
     ["Settings", "settings", viewPaths.Settings],
@@ -312,7 +320,7 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
                   activeSalary={activeSalary}
                   expectedIncome={expectedIncome}
                   onIncome={() => openIncome()}
-                  onExpense={() => openExpense()}
+                  onExpense={(budgetMode) => openExpense(undefined, budgetMode)}
                   onSalary={() => openSalary()}
                   onView={navigateToView}
                 />
@@ -402,6 +410,23 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
                   }}
                 />
               )}
+              {view === "Salary periods" && (
+                <SalaryPeriodsPage
+                  periods={data.salaryPeriods}
+                  data={data}
+                  today={today}
+                  onAdd={() => openSalary()}
+                  onEdit={openSalary}
+                  onDelete={(item) => {
+                    try {
+                      session.deleteSalaryPeriod(item.id);
+                      flash("Salary period removed");
+                    } catch (reason) {
+                      showError(reason);
+                    }
+                  }}
+                />
+              )}
               {view === "Analytics" && (
                 <AnalyticsPage data={data} summary={summary} onSalary={() => openSalary()} />
               )}
@@ -462,6 +487,7 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
       {dialog === "expense" && (
         <TransactionFormDialog
           initial={editingExpense}
+          defaultBudgetMode={expenseBudgetMode}
           accounts={data.accounts}
           onClose={() => setDialog(null)}
           onSave={(record) => {

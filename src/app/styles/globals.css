@@ -30,6 +30,109 @@
   --radius: 0.625rem;
 }
 
+.salary-period-list {
+  display: grid;
+  gap: 10px;
+}
+
+.salary-period-card {
+  display: grid;
+  grid-template-columns: minmax(145px, 1fr) 2fr auto;
+  align-items: center;
+  gap: 18px;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--card);
+}
+
+.salary-period-title > div,
+.salary-period-metrics > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.salary-period-title > div > b {
+  font-size: 12px;
+}
+
+.salary-period-title > div > span,
+.salary-period-metrics small {
+  color: var(--muted-foreground);
+  font-size: 9px;
+}
+
+.salary-period-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.salary-period-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.salary-period-metrics b {
+  color: var(--foreground);
+  font-size: 11px;
+}
+
+.salary-period-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.salary-period-actions button {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--muted-foreground);
+  font-size: 9px;
+  cursor: pointer;
+}
+
+.salary-period-actions button:hover {
+  border-color: #d6d1fa;
+  color: #5e50d0;
+}
+
+@media (max-width: 1000px) {
+  .salary-period-card {
+    grid-template-columns: 1fr auto;
+  }
+
+  .salary-period-metrics {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .salary-period-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+}
+
+@media (max-width: 600px) {
+  .salary-period-card {
+    grid-template-columns: 1fr;
+  }
+
+  .salary-period-title,
+  .salary-period-metrics,
+  .salary-period-actions {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .salary-period-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 .dark {
   color-scheme: dark;
   --background: #11131a;
@@ -96,6 +199,71 @@
 .storage-gate-card h1{margin:11px 0 9px;color:#282a36;font-size:23px;line-height:1.25;letter-spacing:-.65px}
 .storage-gate-card p{max-width:330px;margin:0;color:#777d8b;font-size:13px;line-height:1.7;overflow-wrap:anywhere}
 .storage-gate-footnote{margin-top:25px;padding:8px 12px;border:1px solid #eeedf4;border-radius:999px;color:#8a8d9a;background:#fbfbfd;font-size:10px}
+
+/* Keep decorative icons distinct from their backgrounds in dark mode. */
+.dark .quick-icon.purple,
+.dark .stat-icon.lilac,
+.dark .empty-state-icon,
+.dark .income-entry-icon.tx-bill,
+.dark .settings-icon,
+.dark .empty-connection-icon,
+.dark .circle-add,
+.dark .modal-note span {
+  background: #302a4a;
+  color: #c2b8ff;
+}
+
+.dark .quick-icon.green,
+.dark .stat-icon.mint,
+.dark .income-symbol,
+.dark .income-entry-icon,
+.dark .privacy-rail > span {
+  background: #20372f;
+  color: #8ed9b8;
+}
+
+.dark .quick-icon.blue {
+  background: #24334a;
+  color: #9bc2ff;
+}
+
+.dark .transaction-icon,
+.dark .transaction-icon.tx-expense {
+  background: #3b3025;
+  color: #f0bd83;
+}
+
+.dark .transaction-icon.tx-bill {
+  background: #302a4a;
+  color: #c2b8ff;
+}
+
+.dark .transaction-icon.tx-income {
+  background: #20372f;
+  color: #8ed9b8;
+}
+
+.dark .setup-symbol,
+.dark .empty-connection-icon {
+  background: #302a4a;
+  color: #c2b8ff;
+}
+
+.dark .integration-orbit,
+.dark .integration-orbit::before {
+  border-color: #484260;
+}
+
+.dark .toast span {
+  background: #20372f;
+  color: #8ed9b8;
+}
+
+.dark .error-toast span {
+  background: #432b2c;
+  color: #f09a92;
+}
+
 @keyframes storage-gate-spin{to{transform:rotate(360deg)}}
 @keyframes storage-gate-enter{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:480px){.storage-gate-card{padding:38px 23px 32px;border-radius:18px}.storage-gate-card h1{font-size:20px}.storage-gate-card p{font-size:12px}}
@@ -300,6 +468,26 @@ select:not(:disabled),
   color: var(--muted-foreground);
   font-size: 9px;
   line-height: 1.5;
+}
+
+.daily-expense-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.daily-expense-actions .primary-button,
+.daily-expense-actions .secondary-button {
+  flex: 1;
+  min-width: 0;
+  padding: 0 8px;
+  font-size: 9px;
+}
+
+@media (max-width: 390px) {
+  .daily-expense-actions {
+    flex-direction: column;
+  }
 }
 
 .dark .daily-budget-row {

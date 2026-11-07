@@ -27,8 +27,7 @@ export function validateIncome(input: IncomeRecord): string[] {
   const errors: string[] = [];
   if (!isRecord(input)) return ["Income record is malformed."];
   if (typeof input.id !== "string" || !input.id.trim()) errors.push("Income id is required.");
-  if (typeof input.description !== "string" || !input.description.trim())
-    errors.push("Description is required.");
+  if (typeof input.description !== "string") errors.push("Description must be a string.");
   if (!validateMinorAmount(input.amountMinor) || input.amountMinor === 0)
     errors.push("Amount must be a positive safe integer in minor units.");
   if (!isCurrency(input.currency)) errors.push("Choose a supported currency.");
@@ -76,13 +75,14 @@ export function validateExpense(input: ExpenseRecord): string[] {
   const errors: string[] = [];
   if (!isRecord(input)) return ["Transaction record is malformed."];
   if (typeof input.id !== "string" || !input.id.trim()) errors.push("Transaction id is required.");
-  if (typeof input.description !== "string" || !input.description.trim())
-    errors.push("Description is required.");
+  if (typeof input.description !== "string") errors.push("Description must be a string.");
   if (typeof input.category !== "string" || !input.category.trim())
     errors.push("Choose a category.");
   if (!validateMinorAmount(input.amountMinor) || input.amountMinor === 0)
     errors.push("Amount must be a positive safe integer in minor units.");
   if (!isCurrency(input.currency)) errors.push("Choose a supported currency.");
+  if (input.budgetMode !== undefined && !["DAILY", "GLOBAL"].includes(input.budgetMode))
+    errors.push("Choose a supported expense budget mode.");
   if (typeof input.occurredAt !== "string" || !Number.isFinite(Date.parse(input.occurredAt)))
     errors.push("Choose a valid transaction date and time.");
   if (!["CONFIRMED", "PENDING", "CANCELLED"].includes(input.status))

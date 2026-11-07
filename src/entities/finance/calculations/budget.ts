@@ -29,13 +29,21 @@ export function calculateBudget(
     (item) => item.type === "INCOME" && expenseApplies(item, period, today),
   );
   const entries = data.expenses.filter((item) => expenseApplies(item, period, today));
-  let incomeMinor = 0;
+  let receivedSalaryMinor = 0;
+  let otherIncomeMinor = 0;
   let expenseMinor = 0;
+  let dailyExpenseTodayMinor = 0;
   let refundMinor = 0;
   const categories = new Map<string, number>();
   const activity = new Map<string, number>();
   const spendingByDay = new Map<string, number>();
-  for (const item of incomes) incomeMinor = addMinorUnits(incomeMinor, item.amountMinor);
+  for (const item of incomes) {
+    if (item.source === "SALARY")
+      receivedSalaryMinor = addMinorUnits(receivedSalaryMinor, item.amountMinor);
+    else otherIncomeMinor = addMinorUnits(otherIncomeMinor, item.amountMinor);
+  }
+  const salaryBudgetMinor = receivedSalaryMinor || period.expectedSalaryMinor || 0;
+  let incomeMinor = addMinorUnits(salaryBudgetMinor, otherIncomeMinor);
   for (const item of transactionIncome) incomeMinor = addMinorUnits(incomeMinor, item.amountMinor);
   for (const item of entries) {
     if (item.type === "TRANSFER") continue;
@@ -53,8 +61,10 @@ export function calculateBudget(
       activity.set(date, addMinorUnits(activity.get(date) || 0, -item.amountMinor));
       continue;
     }
-    expenseMinor = addMinorUnits(expenseMinor, item.amountMinor);
     const date = item.occurredAt.slice(0, 10);
+    expenseMinor = addMinorUnits(expenseMinor, item.amountMinor);
+    if (date === today && item.budgetMode === "DAILY")
+      dailyExpenseTodayMinor = addMinorUnits(dailyExpenseTodayMinor, item.amountMinor);
     spendingByDay.set(date, addMinorUnits(spendingByDay.get(date) || 0, item.amountMinor));
     categories.set(
       item.category,
@@ -68,33 +78,16 @@ export function calculateBudget(
   const elapsedDays = Math.min(daysInPeriod, Math.max(0, dayDifference(period.startsOn, today)));
   const periodProgress = Math.min(100, Math.floor((elapsedDays / daysInPeriod) * 100));
 
-  // Allocate confirmed period income evenly across its days, distributing
-  // indivisible minor units from the start. The cumulative form of the daily
-  // reconciliation recurrence avoids storing derived day records while still
-  // replaying the effect of all prior confirmed activity deterministically.
-  const dailyIncomeBase = Math.trunc(incomeMinor / daysInPeriod);
-  const dailyIncomeRemainder = incomeMinor % daysInPeriod;
-  const currentDayIndex = Math.min(
-    daysInPeriod - 1,
-    Math.max(0, dayDifference(period.startsOn, today)),
-  );
-  const allocatedBeforeToday = addMinorUnits(
-    multiplyMinorUnits(dailyIncomeBase, currentDayIndex),
-    Math.min(currentDayIndex, dailyIncomeRemainder),
-  );
-  let spendingBeforeTodayMinor = 0;
-  for (const [date, amountMinor] of spendingByDay) {
-    if (date < today)
-      spendingBeforeTodayMinor = addMinorUnits(spendingBeforeTodayMinor, amountMinor);
-  }
-  const dailyBaseAllowanceMinor = addMinorUnits(
-    dailyIncomeBase,
-    currentDayIndex < dailyIncomeRemainder ? 1 : 0,
-  );
-  const previousCarryoverMinor = addMinorUnits(allocatedBeforeToday, -spendingBeforeTodayMinor);
-  const availableTodayMinor = addMinorUnits(dailyBaseAllowanceMinor, previousCarryoverMinor);
+  // Today's daily expenses reduce today's remaining amount, but are held out
+  // of the daily allowance calculation until the next day. Global expenses
+  // reduce the balance used for today's allowance immediately.
+  const remainingDays = Math.max(1, daysUntilSalary);
+  const balanceBeforeDailyExpensesToday = addMinorUnits(remainingMinor, dailyExpenseTodayMinor);
+  const dailyBaseAllowanceMinor = Math.trunc(balanceBeforeDailyExpensesToday / remainingDays);
+  const previousCarryoverMinor = 0;
+  const availableTodayMinor = dailyBaseAllowanceMinor;
   const spentTodayMinor = spendingByDay.get(today) || 0;
-  const remainingTodayMinor = addMinorUnits(availableTodayMinor, -spentTodayMinor);
+  const remainingTodayMinor = addMinorUnits(availableTodayMinor, -dailyExpenseTodayMinor);
 
   const elapsedOutflow = addMinorUnits(expenseMinor, -refundMinor);
   const dailyOutflow = elapsedDays > 0 ? Math.trunc(elapsedOutflow / elapsedDays) : 0;

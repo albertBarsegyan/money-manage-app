@@ -10,6 +10,7 @@ import {
   type TransactionType,
   type AccountRecord,
   type ExpenseRecord,
+  type ExpenseBudgetMode,
 } from "@/entities/finance";
 import { AccountSelect, MoneyField } from "@/entities/finance";
 import { FormActions, FormField, FormSelect, Input, RecordDialog, Textarea } from "@/shared/ui";
@@ -27,6 +28,10 @@ const transactionStatusOptions = [
   { value: "PENDING", label: "Pending" },
   { value: "CANCELLED", label: "Cancelled" },
 ];
+const budgetModeOptions = [
+  { value: "DAILY", label: "Daily expense" },
+  { value: "GLOBAL", label: "Global expense" },
+];
 const categoryOptions = EXPENSE_CATEGORIES.map((category) => ({
   value: category,
   label: category,
@@ -34,11 +39,13 @@ const categoryOptions = EXPENSE_CATEGORIES.map((category) => ({
 
 export function TransactionFormDialog({
   initial,
+  defaultBudgetMode = "GLOBAL",
   accounts,
   onClose,
   onSave,
 }: {
   initial?: ExpenseRecord;
+  defaultBudgetMode?: ExpenseBudgetMode;
   accounts: AccountRecord[];
   onClose: () => void;
   onSave: (record: ExpenseRecord) => void;
@@ -47,6 +54,7 @@ export function TransactionFormDialog({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
       type: initial?.type ?? "EXPENSE",
+      budgetMode: initial?.budgetMode ?? defaultBudgetMode,
       description: initial?.description ?? "",
       amount: initial ? (initial.amountMinor / 100).toFixed(2) : "",
       currency: initial?.currency ?? "AMD",
@@ -58,10 +66,20 @@ export function TransactionFormDialog({
       notes: initial?.notes ?? "",
     },
   });
-  const [amount, currency, type, accountId, destinationAccountId, status, category] = useWatch({
-    control: form.control,
-    name: ["amount", "currency", "type", "accountId", "destinationAccountId", "status", "category"],
-  });
+  const [amount, currency, type, budgetMode, accountId, destinationAccountId, status, category] =
+    useWatch({
+      control: form.control,
+      name: [
+        "amount",
+        "currency",
+        "type",
+        "budgetMode",
+        "accountId",
+        "destinationAccountId",
+        "status",
+        "category",
+      ],
+    });
   const matchingAccounts = useMemo(
     () => accounts.filter((account) => account.currency === currency),
     [accounts, currency],
@@ -82,6 +100,7 @@ export function TransactionFormDialog({
       notes: values.notes.trim() || undefined,
       status: values.status,
       type: values.type,
+      budgetMode: values.type === "EXPENSE" ? values.budgetMode : undefined,
       source: initial?.source ?? "MANUAL",
       reviewStatus:
         initial?.source !== "MANUAL" && !confirmed
@@ -113,6 +132,19 @@ export function TransactionFormDialog({
             })
           }
         />
+        {type === "EXPENSE" && (
+          <FormSelect
+            label="Budget handling"
+            value={budgetMode}
+            options={budgetModeOptions}
+            onValueChange={(value) =>
+              form.setValue("budgetMode", value as ExpenseBudgetMode, {
+                shouldDirty: true,
+                shouldValidate: true,
+              })
+            }
+          />
+        )}
         <FormField
           label={
             type === "REFUND"
@@ -220,7 +252,9 @@ export function TransactionFormDialog({
               ? "Confirmed refunds increase the remaining budget."
               : type === "INCOME"
                 ? "Confirmed income increases the available budget."
-                : "Only confirmed expenses affect the budget."}
+                : budgetMode === "DAILY"
+                  ? "Daily expenses reduce today’s remaining amount. They are included in the period balance tomorrow."
+                  : "Global expenses reduce the period balance and recalculate today’s budget immediately."}
         </p>
         <FormActions
           onCancel={onClose}

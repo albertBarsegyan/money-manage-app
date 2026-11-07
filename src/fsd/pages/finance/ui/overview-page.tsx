@@ -1,6 +1,7 @@
 import {
   calculateBudget,
   type FinanceData,
+  type ExpenseBudgetMode,
   type IncomeRecord,
   type SalaryPeriod,
 } from "@/entities/finance";
@@ -31,7 +32,7 @@ export function Overview({
   activeSalary: SalaryPeriod | undefined;
   expectedIncome: IncomeRecord[];
   onIncome: () => void;
-  onExpense: () => void;
+  onExpense: (mode?: ExpenseBudgetMode) => void;
   onSalary: () => void;
   onView: (view: View) => void;
 }) {
@@ -68,7 +69,7 @@ export function Overview({
             </div>
             <div className="budget-breakdown">
               <span>
-                Confirmed income{" "}
+                Salary and confirmed income{" "}
                 <b>{amountLabel(summary.confirmedIncomeMinor, summary.currency)}</b>
               </span>
               <span>
@@ -88,27 +89,31 @@ export function Overview({
               </div>
               <div className="daily-budget-breakdown">
                 <div className="daily-budget-row">
-                  <span>Daily base allowance</span>
-                  <b>{amountLabel(summary.dailyBaseAllowanceMinor, summary.currency)}</b>
-                </div>
-                <div className="daily-budget-row">
-                  <span>Previous accumulated carryover</span>
-                  <b>{amountLabel(summary.previousCarryoverMinor, summary.currency)}</b>
+                  <span>Remaining period budget</span>
+                  <b>{amountLabel(summary.remainingMinor, summary.currency)}</b>
                 </div>
                 <div className="daily-budget-row daily-budget-total">
-                  <span>Total available today</span>
+                  <span>
+                    Daily budget for {daysLabel(Math.max(1, summary.daysUntilSalary))} remaining
+                  </span>
                   <b>{amountLabel(summary.availableTodayMinor, summary.currency)}</b>
                 </div>
-                <div className="daily-budget-row">
-                  <span>Net spending today</span>
-                  <b>{amountLabel(summary.spentTodayMinor, summary.currency)}</b>
-                </div>
                 <div className="daily-budget-row daily-budget-remaining">
-                  <span>Remaining today</span>
+                  <span>Left to spend today after daily expenses</span>
                   <b>{amountLabel(summary.remainingTodayMinor, summary.currency)}</b>
                 </div>
               </div>
-              <small>Today&apos;s unused amount or overspending carries forward at day end.</small>
+              <small>
+                Daily expenses use today’s allowance. Global expenses recalculate it immediately.
+              </small>
+              <div className="daily-expense-actions">
+                <button className="secondary-button" onClick={() => onExpense("DAILY")}>
+                  Add daily expense
+                </button>
+                <button className="primary-button" onClick={() => onExpense("GLOBAL")}>
+                  Add global expense
+                </button>
+              </div>
             </div>
             <div className="stat-card">
               <div className="stat-top">
@@ -127,8 +132,8 @@ export function Overview({
             <div className="eyebrow">START WITH YOUR OWN NUMBERS</div>
             <h2>Set up a salary period</h2>
             <p>
-              Add your salary dates and currency to calculate your safe daily spending. Nothing is
-              filled in for you.
+              Add your expected salary and pay dates to set a starting budget. Confirmed expenses
+              then reduce it and update your daily budget immediately.
             </p>
             <button className="primary-button" onClick={onSalary}>
               <Icon name="plus" size={16} /> Configure salary period
@@ -141,7 +146,7 @@ export function Overview({
           <div className="eyebrow">QUICK ACTIONS</div>
           <h2>Manage your money</h2>
         </div>
-        <button className="quick-action" onClick={onExpense}>
+        <button className="quick-action" onClick={() => onExpense("GLOBAL")}>
           <span className="quick-icon purple">
             <Icon name="plus" />
           </span>

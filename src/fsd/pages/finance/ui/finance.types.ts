@@ -1,2 +1,9 @@
 export type View =
-  "Overview" | "Transactions" | "Income" | "Accounts" | "Analytics" | "Integrations" | "Settings";
+  | "Overview"
+  | "Transactions"
+  | "Income"
+  | "Accounts"
+  | "Salary periods"
+  | "Analytics"
+  | "Integrations"
+  | "Settings";

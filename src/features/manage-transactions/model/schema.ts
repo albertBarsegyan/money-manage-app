@@ -4,7 +4,8 @@ import { parseMoney } from "@/entities/finance";
 export const transactionSchema = z
   .object({
     type: z.enum(["EXPENSE", "INCOME", "REFUND", "TRANSFER"]),
-    description: z.string().trim().min(1, "Describe this transaction."),
+    budgetMode: z.enum(["DAILY", "GLOBAL"]),
+    description: z.string().trim(),
     amount: z.string().trim().min(1, "Enter an amount."),
     currency: z.enum(["AMD", "USD", "EUR", "GBP"]),
     category: z.string().trim().min(1, "Choose a category."),

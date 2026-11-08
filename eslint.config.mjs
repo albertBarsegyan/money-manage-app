@@ -26,6 +26,7 @@ const eslintConfig = defineConfig([
         { type: "feature", pattern: "src/features/**" },
         { type: "entity", pattern: "src/entities/**" },
         { type: "shared", pattern: "src/shared/**" },
+        { type: "native", pattern: "src/lib/native/**" },
       ],
     },
     rules: {
@@ -38,7 +39,9 @@ const eslintConfig = defineConfig([
               from: { element: { type: "app" } },
               allow: {
                 to: {
-                  element: { types: ["routes", "page", "widget", "feature", "entity", "shared"] },
+                  element: {
+                    types: ["routes", "page", "widget", "feature", "entity", "shared", "native"],
+                  },
                 },
               },
             },
@@ -48,7 +51,9 @@ const eslintConfig = defineConfig([
             },
             {
               from: { element: { type: "page" } },
-              allow: { to: { element: { types: ["widget", "feature", "entity", "shared"] } } },
+              allow: {
+                to: { element: { types: ["widget", "feature", "entity", "shared", "native"] } },
+              },
             },
             {
               from: { element: { type: "widget" } },

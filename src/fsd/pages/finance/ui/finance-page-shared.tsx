@@ -77,11 +77,13 @@ export function EmptyState({
 }) {
   return (
     <div className="empty-state">
-      <div className="empty-state-icon">◌</div>
+      <div className="empty-state-icon" aria-hidden="true">
+        ◌
+      </div>
       <b>{title}</b>
       <span>{text}</span>
       {action && onAction && (
-        <button className="text-link" onClick={onAction}>
+        <button type="button" className="text-link" onClick={onAction}>
           {action} <Icon name="chevron" size={14} />
         </button>
       )}

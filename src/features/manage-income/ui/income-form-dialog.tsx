@@ -49,7 +49,7 @@ export function IncomeFormDialog({
       recurrence: initial?.recurrence ?? "MONTHLY",
       salaryPeriodId: initial?.salaryPeriodId ?? "",
       accountId: initial?.accountId ?? "",
-      status: initial?.status ?? "EXPECTED",
+      status: initial?.status ?? "RECEIVED",
     },
   });
   const [amount, currency, accountId, source, recurrence, salaryPeriodId, status] = useWatch({

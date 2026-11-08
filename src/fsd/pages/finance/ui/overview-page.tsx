@@ -2,6 +2,7 @@ import {
   calculateBudget,
   type FinanceData,
   type ExpenseBudgetMode,
+  type ExpenseRecord,
   type IncomeRecord,
   type SalaryPeriod,
 } from "@/entities/finance";
@@ -26,6 +27,10 @@ export function Overview({
   onExpense,
   onSalary,
   onView,
+  onEditExpense,
+  onDeleteExpense,
+  onConfirmExpense,
+  onRejectExpense,
 }: {
   data: FinanceData;
   summary: ReturnType<typeof calculateBudget> | undefined;
@@ -35,6 +40,10 @@ export function Overview({
   onExpense: (mode?: ExpenseBudgetMode) => void;
   onSalary: () => void;
   onView: (view: View) => void;
+  onEditExpense: (item: ExpenseRecord) => void;
+  onDeleteExpense: (item: ExpenseRecord) => void;
+  onConfirmExpense: (item: ExpenseRecord) => void;
+  onRejectExpense: (item: ExpenseRecord) => void;
 }) {
   const recent = [...data.expenses]
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
@@ -178,7 +187,14 @@ export function Overview({
             </button>
           </div>
           {recent.length ? (
-            <TransactionRows items={recent} accounts={data.accounts} />
+            <TransactionRows
+              items={recent}
+              accounts={data.accounts}
+              onEdit={onEditExpense}
+              onDelete={onDeleteExpense}
+              onConfirm={onConfirmExpense}
+              onReject={onRejectExpense}
+            />
           ) : (
             <EmptyState
               title="No financial activity yet"

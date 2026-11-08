@@ -17,7 +17,7 @@
   --secondary: #f0eefc;
   --secondary-foreground: #5145b4;
   --muted: #f1f2f5;
-  --muted-foreground: #858b99;
+  --muted-foreground: #626979;
   --accent: #f2f0ff;
   --accent-foreground: #5145b4;
   --destructive: #b34f49;
@@ -147,7 +147,7 @@
   --secondary: #29263d;
   --secondary-foreground: #c8c0ff;
   --muted: #22252f;
-  --muted-foreground: #a0a5b3;
+  --muted-foreground: #b4b9c6;
   --accent: #29263d;
   --accent-foreground: #d6d0ff;
   --destructive: #e17b72;
@@ -282,6 +282,49 @@
 .dark .error-toast span {
   background: #432b2c;
   color: #f09a92;
+}
+
+.dark .storage-gate {
+  background: radial-gradient(ellipse at 50% 38%, #25213a 0%, #151720 48%, #11131a 100%);
+}
+
+.dark .storage-gate-card {
+  background: rgb(25 28 37 / 94%);
+  border-color: #343744;
+  box-shadow: 0 24px 70px rgb(0 0 0 / 35%), 0 3px 12px rgb(0 0 0 / 20%);
+}
+
+.dark .storage-gate-mark {
+  background: #302a4a;
+  color: #c2b8ff;
+}
+
+.dark .storage-gate-mark.is-loading span {
+  border-color: #484260;
+  border-top-color: var(--primary);
+}
+
+.dark .storage-gate-mark.is-error {
+  background: #432b2c;
+  color: #f09a92;
+}
+
+.dark .storage-gate-brand {
+  color: #c2b8ff;
+}
+
+.dark .storage-gate-card h1 {
+  color: var(--foreground);
+}
+
+.dark .storage-gate-card p {
+  color: var(--muted-foreground);
+}
+
+.dark .storage-gate-footnote {
+  background: var(--muted);
+  border-color: var(--border);
+  color: var(--muted-foreground);
 }
 
 @keyframes storage-gate-spin{to{transform:rotate(360deg)}}
@@ -586,12 +629,14 @@ select:not(:disabled),
     width: min(290px, calc(100vw - 52px));
     padding: 24px 16px 14px;
     transform: translateX(-105%);
+    visibility: hidden;
     transition: transform 180ms ease;
     box-shadow: 12px 0 32px #17172a16;
   }
 
   .sidebar.mobile-open {
     transform: translateX(0);
+    visibility: visible;
   }
 
   .sidebar .brand {
@@ -1141,4 +1186,277 @@ select:not(:disabled),
   .danger-button {
     transition: none;
   }
+}
+
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  transform: translateY(-160%);
+  padding: 10px 14px;
+  border-radius: 7px;
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[role="combobox"]:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.search-box:focus-within,
+.import-button:focus-within {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.workspace-label,
+.eyebrow,
+.subtitle,
+.privacy-rail small,
+.stat-card small,
+.panel-heading p,
+.integration-section-heading p,
+.accounts-header p,
+.transaction-main span,
+.upcoming-copy span,
+.income-entry-main span,
+.income-entry-date span,
+.income-entry-date small,
+.account-bottom,
+.account-footnote,
+.fact-row span,
+.salary-period-title > div > span,
+.salary-period-metrics small {
+  color: var(--muted-foreground);
+}
+
+.amount-positive,
+.upcoming-amount,
+.income-entry-amount {
+  color: #147458;
+}
+
+.dark .amount-positive,
+.dark .upcoming-amount,
+.dark .income-entry-amount {
+  color: #80d0ae;
+}
+
+@media (min-width: 761px) {
+  body {
+    font-size: 16px;
+  }
+
+  .workspace-label,
+  .eyebrow {
+    font-size: 12px;
+  }
+
+  .nav-item {
+    font-size: 15px;
+  }
+
+  .privacy-rail b,
+  .mode-indicator {
+    font-size: 14px;
+  }
+
+  .privacy-rail small,
+  .breadcrumbs {
+    font-size: 13px;
+  }
+
+  .page-heading h1 {
+    font-size: 32px;
+  }
+
+  .salary-period-title > div > b,
+  .settings-title h2,
+  .account-card h3 {
+    font-size: 17px;
+  }
+
+  .subtitle,
+  .setup-card p,
+  .integration-intro p {
+    font-size: 15px;
+  }
+
+  .primary-button,
+  .secondary-button,
+  .danger-button,
+  .daily-hero-card .primary-button,
+  .daily-hero-card .secondary-button {
+    min-height: 44px;
+    font-size: 14px;
+  }
+
+  .card-top,
+  .balance-foot {
+    font-size: 14px;
+  }
+
+  .period-chip,
+  .over-label {
+    font-size: 13px;
+  }
+
+  .budget-breakdown,
+  .balance-foot,
+  .stat-top,
+  .setup-card p,
+  .quick-action small,
+  .panel-heading p,
+  .integration-section-heading p,
+  .accounts-header p,
+  .text-link,
+  .income-link,
+  .period-note,
+  .period-note > button,
+  .empty-state > span,
+  .sum-card > span,
+  .sum-card small,
+  .income-entry-main span,
+  .income-entry-date span,
+  .income-entry-date small,
+  .account-bottom,
+  .account-footnote,
+  .fact-row,
+  .daily-hero-note,
+  .daily-spend-progress-meta {
+    font-size: 13px;
+  }
+
+  .budget-breakdown b,
+  .quick-action b,
+  .transaction-main b,
+  .transaction-amount-wrap > b,
+  .upcoming-copy b,
+  .upcoming-amount,
+  .income-entry-amount,
+  .income-entry-main b,
+  .salary-period-metrics b,
+  .account-card h3,
+  .provider-status,
+  .field-label,
+  .salary-period-actions button,
+  .row-actions button {
+    font-size: 14px;
+  }
+
+  .quick-actions h2,
+  .panel-heading h2,
+  .integration-section-heading h2,
+  .accounts-header h2 {
+    font-size: 18px;
+  }
+
+  .quick-action {
+    min-height: 72px;
+    padding-inline: 13px;
+  }
+
+  .transaction-row {
+    min-height: 64px;
+  }
+
+  .transaction-main span,
+  .upcoming-copy span,
+  .tx-status,
+  .source-tag,
+  .status-pill,
+  .salary-period-title > div > span,
+  .salary-period-metrics small,
+  .form-field > p,
+  .modal-note {
+    font-size: 12px;
+  }
+
+  .field-label input,
+  .field-label select,
+  .field-label textarea,
+  .search-box input {
+    font-size: 15px;
+  }
+
+  .row-actions button,
+  .salary-period-actions button {
+    min-height: 40px;
+    padding: 8px 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+:root {
+  --finora-safe-area-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --finora-safe-area-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --finora-safe-area-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --finora-safe-area-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+}
+
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: var(--finora-safe-area-top);
+  padding-bottom: var(--finora-safe-area-bottom);
+}
+
+.sidebar {
+  top: var(--finora-safe-area-top);
+  bottom: var(--finora-safe-area-bottom);
+  padding-left: max(16px, var(--finora-safe-area-left));
+  padding-right: max(16px, var(--finora-safe-area-right));
+}
+
+.main-area {
+  min-height: calc(100dvh - var(--finora-safe-area-top) - var(--finora-safe-area-bottom));
+}
+
+.modal-backdrop {
+  padding-top: max(15px, var(--finora-safe-area-top));
+  padding-right: max(15px, var(--finora-safe-area-right));
+  padding-bottom: max(15px, var(--finora-safe-area-bottom));
+  padding-left: max(15px, var(--finora-safe-area-left));
+}
+
+.modal {
+  max-height: min(
+    92vh,
+    calc(100dvh - var(--finora-safe-area-top) - var(--finora-safe-area-bottom) - 30px)
+  );
+}
+
+.toast {
+  right: max(24px, var(--finora-safe-area-right));
+  bottom: calc(22px + var(--finora-safe-area-bottom));
+  left: max(24px, var(--finora-safe-area-left));
+  width: fit-content;
+}
+
+.mobile-nav-backdrop {
+  top: var(--finora-safe-area-top);
+  bottom: var(--finora-safe-area-bottom);
 }

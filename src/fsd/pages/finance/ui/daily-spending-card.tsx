@@ -15,21 +15,16 @@ export function DailySpendingCard({
   onGlobalExpense: () => void;
 }) {
   const available = summary.availableTodayMinor;
+  const allowance = summary.dailyAllowanceMinor;
   const spent = summary.spentTodayMinor;
-  const remaining = summary.remainingTodayMinor;
   const progress =
-    available > 0
-      ? Math.min(100, Math.max(0, Math.round((spent / available) * 100)))
+    allowance > 0
+      ? Math.min(100, Math.max(0, Math.round((spent / allowance) * 100)))
       : spent > 0
         ? 100
         : 0;
-  const overspent = remaining < 0;
-  const carryover = summary.previousCarryoverMinor;
+  const overspent = available < 0;
   const moneyText = (amount: number) => amountLabel(amount, summary.currency);
-  const signedCarryover =
-    carryover === 0
-      ? moneyText(0)
-      : `${carryover > 0 ? "+" : "−"}${moneyText(Math.abs(carryover))}`;
 
   return (
     <article className="daily-hero-card" aria-labelledby="daily-spend-heading">
@@ -60,7 +55,7 @@ export function DailySpendingCard({
         aria-valuenow={progress}
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-label={`Spent ${progress}% of today's available amount`}
+        aria-label={`Spent ${progress}% of today's allowance`}
       >
         <i style={{ width: `${progress}%` }} className={overspent ? "is-over" : undefined} />
       </div>
@@ -69,34 +64,29 @@ export function DailySpendingCard({
           Spent today <b>{moneyText(spent)}</b>
         </span>
         <span>
-          {overspent ? "Over by" : "Remaining today"} <b>{moneyText(Math.abs(remaining))}</b>
+          {overspent ? "Over by" : "Remaining today"} <b>{moneyText(Math.abs(available))}</b>
         </span>
       </div>
 
       <dl className="daily-hero-breakdown">
         <div>
           <dt>Daily allowance</dt>
-          <dd>{moneyText(summary.dailyBaseAllowanceMinor)}</dd>
+          <dd>{moneyText(allowance)}</dd>
         </div>
-        {carryover !== 0 && (
-          <div className={carryover < 0 ? "is-negative" : "is-positive"}>
-            <dt>{carryover < 0 ? "Overspent from earlier days" : "Unused from previous days"}</dt>
-            <dd>{signedCarryover}</dd>
-          </div>
-        )}
         <div>
           <dt>Spent today</dt>
           <dd>{moneyText(spent)}</dd>
         </div>
         <div className="daily-hero-remaining-row">
           <dt>Remaining today</dt>
-          <dd>{moneyText(remaining)}</dd>
+          <dd>{moneyText(available)}</dd>
         </div>
       </dl>
 
       <p className="daily-hero-note">
-        Daily expenses use today’s allowance. Global expenses reduce the period budget and
-        recalculate future daily limits.
+        Today’s allowance is the remaining period budget divided by days left. Daily expenses use
+        that allowance; global expenses reduce the period budget immediately. Unspent money stays in
+        the period balance and is shared across the days remaining.
       </p>
 
       <div className="daily-expense-actions">

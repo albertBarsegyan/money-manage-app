@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Menu, X } from "lucide-react";
@@ -21,7 +21,8 @@ import { IncomeFormDialog } from "@/features/manage-income";
 import { SalaryPeriodFormDialog } from "@/features/manage-salary-periods";
 import { TransactionFormDialog } from "@/features/manage-transactions";
 import { ThemeSwitcher } from "@/features/theme-switcher";
-import { PwaInstallButton } from "@/app/providers/pwa-support";
+import { PwaInstallButton } from "@/widgets/pwa-controls";
+import { exitNativeApp, useAndroidBackButton, useFinoraAppUrlOpen } from "@/lib/native";
 import { routeTransition, routeVariants } from "@/shared/lib/motion";
 import type { StorageMode } from "@/entities/finance";
 import type { View } from "./finance.types";
@@ -94,6 +95,8 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
   const view = routeView ?? viewForPath(pathname);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const previousPathnameRef = useRef(pathname);
   const [editingIncome, setEditingIncome] = useState<IncomeRecord | undefined>();
   const [editingExpense, setEditingExpense] = useState<ExpenseRecord | undefined>();
   const [expenseBudgetMode, setExpenseBudgetMode] = useState<ExpenseBudgetMode>("GLOBAL");
@@ -103,6 +106,42 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const today = useSyncExternalStore(subscribeToDate, localDate, serverDate);
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setMobileNavOpen(false);
+      mobileMenuButtonRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileNavOpen]);
+  useEffect(() => {
+    if (previousPathnameRef.current === pathname) return;
+    previousPathnameRef.current = pathname;
+    document.getElementById("page-heading")?.focus();
+  }, [pathname]);
+  useAndroidBackButton(({ canGoBack }) => {
+    if (dialog) {
+      setDialog(null);
+      return;
+    }
+    if (mobileNavOpen) {
+      setMobileNavOpen(false);
+      mobileMenuButtonRef.current?.focus();
+      return;
+    }
+    if (canGoBack) {
+      router.back();
+      return;
+    }
+    void exitNativeApp().catch((reason: unknown) => {
+      console.error("Could not close Finora.", reason);
+    });
+  });
+  useFinoraAppUrlOpen((path) => {
+    if (path !== pathname) router.replace(path);
+  });
   const activeSalary = currentSalaryPeriod(data, today);
   const summary = activeSalary ? calculateBudget(data, activeSalary, today) : undefined;
   const filteredExpenses = useMemo(
@@ -219,17 +258,24 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
           type="button"
           className="mobile-nav-backdrop"
           aria-label="Close navigation menu"
-          onClick={() => setMobileNavOpen(false)}
+          onClick={() => {
+            setMobileNavOpen(false);
+            mobileMenuButtonRef.current?.focus();
+          }}
         />
       )}
       <aside className={`sidebar${mobileNavOpen ? " mobile-open" : ""}`}>
         <div className="brand">
-          <div className="brand-mark">f</div>
+          <div className="brand-mark" aria-hidden="true">
+            f
+          </div>
           <span>finora</span>
-          <span className="brand-dot">.</span>
+          <span className="brand-dot" aria-hidden="true">
+            .
+          </span>
         </div>
         <div className="workspace-label">FINANCIAL SPACE</div>
-        <nav className="nav-list">
+        <nav id="main-navigation" className="nav-list" aria-label="Main navigation">
           {nav.map(([item, icon, path]) => (
             <Link
               key={item}
@@ -241,7 +287,9 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
               <Icon name={icon} />
               <span>{item}</span>
               {item === "Transactions" && pendingCount > 0 && (
-                <i className="nav-count">{pendingCount}</i>
+                <i aria-label={`${pendingCount} pending transactions`} className="nav-count">
+                  {pendingCount}
+                </i>
               )}
             </Link>
           ))}
@@ -258,13 +306,15 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
           </div>
         </div>
       </aside>
-      <main className="main-area">
+      <main id="main-content" className="main-area" tabIndex={-1}>
         <header className="topbar">
           <button
+            ref={mobileMenuButtonRef}
             className="mobile-menu-button"
             type="button"
             aria-label={mobileNavOpen ? "Close navigation menu" : "Open navigation menu"}
             aria-expanded={mobileNavOpen}
+            aria-controls="main-navigation"
             onClick={() => setMobileNavOpen((open) => !open)}
           >
             {mobileNavOpen ? <X size={19} /> : <Menu size={19} />}
@@ -300,7 +350,9 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
                         }).format(new Date(`${today}T12:00:00`))
                       : "PRIVATE FINANCIAL WORKSPACE"}
                   </div>
-                  <h1>{heading}</h1>
+                  <h1 id="page-heading" tabIndex={-1}>
+                    {heading}
+                  </h1>
                   {view === "Overview" && (
                     <p className="subtitle">
                       See how much you can spend today, then the rest of your period.
@@ -309,7 +361,11 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
                 </div>
                 <div className="heading-actions">
                   {view !== "Settings" && view !== "Integrations" && (
-                    <button className="primary-button" onClick={() => openExpense()}>
+                    <button
+                      className="primary-button"
+                      aria-label="Add expense"
+                      onClick={() => openExpense()}
+                    >
                       <Icon name="plus" size={17} />{" "}
                       <span className="hidden lg:block">Add expense</span>
                     </button>
@@ -327,6 +383,39 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
                   onExpense={(budgetMode) => openExpense(undefined, budgetMode)}
                   onSalary={() => openSalary()}
                   onView={navigateToView}
+                  onEditExpense={openExpense}
+                  onDeleteExpense={(item) => {
+                    try {
+                      session.deleteExpense(item.id);
+                      flash("Transaction removed from this device");
+                    } catch (reason) {
+                      showError(reason);
+                    }
+                  }}
+                  onConfirmExpense={(item) => {
+                    try {
+                      session.updateExpense({
+                        ...item,
+                        status: "CONFIRMED",
+                        reviewStatus: "CONFIRMED",
+                      });
+                      flash("Transaction confirmed");
+                    } catch (reason) {
+                      showError(reason);
+                    }
+                  }}
+                  onRejectExpense={(item) => {
+                    try {
+                      session.updateExpense({
+                        ...item,
+                        status: "CANCELLED",
+                        reviewStatus: "REJECTED",
+                      });
+                      flash("Transaction rejected");
+                    } catch (reason) {
+                      showError(reason);
+                    }
+                  }}
                 />
               )}
               {view === "Income" && (

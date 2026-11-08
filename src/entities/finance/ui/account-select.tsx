@@ -1,6 +1,6 @@
 "use client";
 
-import { FormField } from "@/shared/ui/form-field";
+import { useId } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import type { AccountRecord } from "../models";
 
@@ -19,13 +19,23 @@ export function AccountSelect({
   optional?: boolean;
   error?: string;
 }) {
+  const id = useId();
+  const errorId = `${id}-error`;
   return (
-    <FormField label={label} error={error}>
+    <div className="form-field grid min-w-0 gap-1.5">
+      <label htmlFor={id} className="text-sm font-medium text-foreground">
+        {label}
+      </label>
       <Select
         value={value}
         onValueChange={(nextValue) => onChange(nextValue === "none" ? "" : nextValue)}
       >
-        <SelectTrigger className="w-full" aria-invalid={Boolean(error)}>
+        <SelectTrigger
+          id={id}
+          className="w-full"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
+        >
           <SelectValue placeholder={optional ? "No account" : "Choose account"} />
         </SelectTrigger>
         <SelectContent>
@@ -37,6 +47,11 @@ export function AccountSelect({
           ))}
         </SelectContent>
       </Select>
-    </FormField>
+      {error && (
+        <p id={errorId} className="text-xs text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

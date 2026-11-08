@@ -17,11 +17,12 @@ export function TransactionRows({
   onReject?: (item: ExpenseRecord) => void;
 }) {
   return (
-    <div className="transaction-list">
+    <div className="transaction-list" role="list" aria-label="Transactions">
       {items.map((item) => (
-        <div className="transaction-row" key={item.id}>
+        <div className="transaction-row" key={item.id} role="listitem">
           <div
             className={`transaction-icon ${item.type === "INCOME" || item.type === "REFUND" ? "tx-income" : item.type === "TRANSFER" ? "tx-bill" : "tx-expense"}`}
+            aria-hidden="true"
           >
             {item.type === "INCOME"
               ? "↙"
@@ -69,12 +70,36 @@ export function TransactionRows({
           <div className="row-actions">
             {item.reviewStatus === "PENDING_REVIEW" && (
               <>
-                <button onClick={() => onConfirm?.(item)}>Confirm</button>
-                <button onClick={() => onReject?.(item)}>Reject</button>
+                <button
+                  type="button"
+                  aria-label={`Confirm ${item.description}`}
+                  onClick={() => onConfirm?.(item)}
+                >
+                  Confirm
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Reject ${item.description}`}
+                  onClick={() => onReject?.(item)}
+                >
+                  Reject
+                </button>
               </>
             )}
-            <button onClick={() => onEdit?.(item)}>Edit</button>
-            <button onClick={() => onDelete?.(item)}>Delete</button>
+            <button
+              type="button"
+              aria-label={`Edit ${item.description}`}
+              onClick={() => onEdit?.(item)}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              aria-label={`Delete ${item.description}`}
+              onClick={() => onDelete?.(item)}
+            >
+              Delete
+            </button>
           </div>
         </div>
       ))}

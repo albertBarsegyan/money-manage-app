@@ -34,7 +34,7 @@ export function SettingsPage({
     <div className="settings-stack">
       <section className="panel settings-panel">
         <div className="settings-title">
-          <span className="settings-icon">
+          <span className="settings-icon" aria-hidden="true">
             <Icon name="shield" />
           </span>
           <div>
@@ -105,7 +105,9 @@ export function SettingsPage({
       </section>
       <section className="panel settings-panel">
         <div className="settings-title">
-          <span className="settings-icon">◷</span>
+          <span className="settings-icon" aria-hidden="true">
+            ◷
+          </span>
           <div>
             <h2>Salary periods</h2>
             <p>Set the dates used by budget calculations.</p>
@@ -124,8 +126,20 @@ export function SettingsPage({
                   {period.currency}
                 </span>
               </div>
-              <button onClick={() => onEditSalary(period)}>Edit</button>
-              <button onClick={() => onDeleteSalary(period)}>Delete</button>
+              <button
+                type="button"
+                aria-label={`Edit ${period.name}`}
+                onClick={() => onEditSalary(period)}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                aria-label={`Delete ${period.name}`}
+                onClick={() => onDeleteSalary(period)}
+              >
+                Delete
+              </button>
             </div>
           ))
         ) : (
@@ -146,7 +160,9 @@ export function SettingsPage({
       </section>
       <section className="panel settings-panel">
         <div className="settings-title">
-          <span className="settings-icon">⇄</span>
+          <span className="settings-icon" aria-hidden="true">
+            ⇄
+          </span>
           <div>
             <h2>Portability</h2>
             <p>Versioned import/export and cross-provider migration.</p>

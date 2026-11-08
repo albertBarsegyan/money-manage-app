@@ -68,7 +68,7 @@ export function IncomePage({
           </button>
         </div>
         {data.income.length ? (
-          <div className="income-list">
+          <div className="income-list" role="list" aria-label="Income records">
             {[...data.income]
               .sort((a, b) =>
                 (b.expectedOn || b.receivedOn || "").localeCompare(
@@ -76,8 +76,10 @@ export function IncomePage({
                 ),
               )
               .map((item) => (
-                <div className="income-entry" key={item.id}>
-                  <div className="income-entry-icon">↙</div>
+                <div className="income-entry" key={item.id} role="listitem">
+                  <div className="income-entry-icon" aria-hidden="true">
+                    ↙
+                  </div>
                   <div className="income-entry-main">
                     <b>{item.description}</b>
                     <span>
@@ -112,10 +114,28 @@ export function IncomePage({
                   <span className={`status-pill ${item.status.toLowerCase()}`}>{item.status}</span>
                   <div className="row-actions">
                     {item.status === "EXPECTED" && (
-                      <button onClick={() => onConfirm(item)}>Confirm received</button>
+                      <button
+                        type="button"
+                        aria-label={`Confirm ${item.description} received`}
+                        onClick={() => onConfirm(item)}
+                      >
+                        Confirm received
+                      </button>
                     )}
-                    <button onClick={() => onEdit(item)}>Edit</button>
-                    <button onClick={() => onDelete(item)}>Delete</button>
+                    <button
+                      type="button"
+                      aria-label={`Edit ${item.description}`}
+                      onClick={() => onEdit(item)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Delete ${item.description}`}
+                      onClick={() => onDelete(item)}
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))}

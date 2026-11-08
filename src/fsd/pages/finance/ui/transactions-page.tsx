@@ -36,6 +36,8 @@ export function TransactionsPage({
           <label className="search-box">
             <Icon name="search" size={16} />
             <input
+              type="search"
+              aria-label="Search transactions"
               placeholder="Search this session"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -52,7 +54,7 @@ export function TransactionsPage({
               }}
             />
           </label>
-          <button className="primary-button small-primary" onClick={onAdd}>
+          <button className="primary-button small-primary" aria-label="Add expense" onClick={onAdd}>
             <Icon name="plus" size={15} /> <span className="hidden lg:block"> Add expense</span>
           </button>
         </div>

@@ -1,0 +1,102 @@
+apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+def releaseSigningEnvironment = [
+    'FINORA_RELEASE_STORE_FILE': System.getenv('FINORA_RELEASE_STORE_FILE'),
+    'FINORA_RELEASE_STORE_PASSWORD': System.getenv('FINORA_RELEASE_STORE_PASSWORD'),
+    'FINORA_RELEASE_KEY_ALIAS': System.getenv('FINORA_RELEASE_KEY_ALIAS'),
+    'FINORA_RELEASE_KEY_PASSWORD': System.getenv('FINORA_RELEASE_KEY_PASSWORD')
+]
+def missingReleaseSigningVariables = releaseSigningEnvironment.findAll { key, value -> !value }.keySet()
+def releaseSigningConfigured = missingReleaseSigningVariables.isEmpty()
+def validateReleaseSigning = tasks.register('validateReleaseSigning') {
+    doLast {
+        if (!releaseSigningConfigured) {
+            throw new GradleException(
+                "Release signing is not configured. Missing environment variables: ${missingReleaseSigningVariables.join(', ')}. See docs/android/signing-guide.md."
+            )
+        }
+        if (!file(releaseSigningEnvironment['FINORA_RELEASE_STORE_FILE']).isFile()) {
+            throw new GradleException('The configured release keystore file does not exist.')
+        }
+    }
+}
+
+android {
+    namespace = "com.finora.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.finora.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        release {
+            if (releaseSigningConfigured) {
+                storeFile file(releaseSigningEnvironment['FINORA_RELEASE_STORE_FILE'])
+                storeType 'PKCS12'
+                storePassword releaseSigningEnvironment['FINORA_RELEASE_STORE_PASSWORD']
+                keyAlias releaseSigningEnvironment['FINORA_RELEASE_KEY_ALIAS']
+                keyPassword releaseSigningEnvironment['FINORA_RELEASE_KEY_PASSWORD']
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+tasks.configureEach { task ->
+    if (task.name in ['packageRelease', 'packageReleaseBundle', 'signReleaseBundle', 'bundleRelease']) {
+        task.dependsOn(validateReleaseSigning)
+    }
+}
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

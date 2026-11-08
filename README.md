@@ -35,4 +35,16 @@ npm test
 npm run typecheck
 ```
 
-The optimized Next.js build can also be run with `npm run build`. In restricted environments, Turbopack may require worker process permissions to build CSS.
+The optimized Next.js build can also be run with `npm run build`.
+
+## Android development
+
+Finora packages a static export of the existing React application with Capacitor for Android. Android builds use the local `out/` bundle; the normal Next.js web build remains separate.
+
+```bash
+npm run android:sync
+npm run android:build:debug
+npm run android:open
+```
+
+See [Android setup and build documentation](docs/android/README.md) for the JDK/SDK requirements, testing workflow, signing, APK/AAB commands, security notes, and Google Play preparation.

@@ -72,15 +72,25 @@ export function SalaryPeriodsPage({
                   <div>
                     <small>Daily budget now</small>
                     <b>
-                      {isCurrent
-                        ? amountLabel(summary.dailyBaseAllowanceMinor, period.currency)
-                        : "—"}
+                      {isCurrent ? amountLabel(summary.dailyAllowanceMinor, period.currency) : "—"}
                     </b>
                   </div>
                 </div>
                 <div className="salary-period-actions">
-                  <button onClick={() => onEdit(period)}>Edit</button>
-                  <button onClick={() => onDelete(period)}>Delete</button>
+                  <button
+                    type="button"
+                    aria-label={`Edit ${period.name}`}
+                    onClick={() => onEdit(period)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete ${period.name}`}
+                    onClick={() => onDelete(period)}
+                  >
+                    Delete
+                  </button>
                 </div>
               </article>
             );

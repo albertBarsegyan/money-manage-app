@@ -28,7 +28,9 @@ export function AccountsPage({
           {data.accounts.map((account) => (
             <article className="account-card" key={account.id}>
               <div className="account-top">
-                <div className="bank-logo">{account.type === "CASH" ? "◌" : "▤"}</div>
+                <div className="bank-logo" aria-hidden="true">
+                  {account.type === "CASH" ? "◌" : "▤"}
+                </div>
                 <span className="account-kind">{accountTypeLabel(account.type)}</span>
               </div>
               <h3>{account.name}</h3>
@@ -38,8 +40,20 @@ export function AccountsPage({
               <div className="account-bottom">
                 <span>Session balance</span>
                 <span>
-                  <button onClick={() => onEdit(account)}>Edit</button>
-                  <button onClick={() => onDelete(account)}>Delete</button>
+                  <button
+                    type="button"
+                    aria-label={`Edit ${account.name}`}
+                    onClick={() => onEdit(account)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Delete ${account.name}`}
+                    onClick={() => onDelete(account)}
+                  >
+                    Delete
+                  </button>
                 </span>
               </div>
             </article>

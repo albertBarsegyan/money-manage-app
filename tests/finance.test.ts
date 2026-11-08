@@ -5,7 +5,9 @@ import { test } from "node:test";
 import {
   calculateAccountBalance,
   calculateBudget,
+  calculateDailyAllowance,
   currentSalaryPeriod,
+  dayDifference,
 } from "../src/entities/finance/calculations/budget";
 import { formatMoney, parseMoney } from "../src/entities/finance/calculations/money";
 import { previewCsvImport } from "../src/entities/finance/csv-import";
@@ -14,6 +16,7 @@ import {
   NotificationCandidateInbox,
   type AndroidNotificationParser,
 } from "../src/features/integrations/android-notifications";
+import { resolveFinoraDeepLink } from "../src/lib/native/deep-links";
 import {
   emptyFinanceData,
   type AccountRecord,
@@ -68,6 +71,17 @@ test("money entry parses to integer minor units without floating point accumulat
   assert.match(formatMoney({ amountMinor: 123, currency: "USD" }, "en-US"), /1\.23/);
 });
 
+test("daily allowance divides the actual remaining pool once and never adds historical carryover twice", () => {
+  const result = calculateDailyAllowance(13_000_000, 28, 0);
+  assert.equal(result.dailyAllowanceMinor, 464_286);
+  assert.equal(result.availableTodayMinor, 464_286);
+  assert.match(
+    formatMoney({ amountMinor: result.dailyAllowanceMinor, currency: "AMD" }, "en-US"),
+    /4,642\.86/,
+  );
+  assert.notEqual(result.dailyAllowanceMinor, 392_717);
+});
+
 test("budget includes only received income and confirmed same-currency activity", () => {
   const data = emptyFinanceData();
   data.salaryPeriods.push(period);
@@ -100,7 +114,7 @@ test("budget includes only received income and confirmed same-currency activity"
   assert.deepEqual(result.categoryTotals, [{ category: "Food", amountMinor: 3_000 }]);
 });
 
-test("spending exactly the daily allowance leaves no carryover", () => {
+test("spending the full allowance leaves no amount available today", () => {
   const data = emptyFinanceData();
   data.income.push({ ...receivedIncome, amountMinor: 30_000 });
   data.expenses.push(
@@ -112,27 +126,24 @@ test("spending exactly the daily allowance leaves no carryover", () => {
     }),
   );
   const day = calculateBudget(data, period, "2026-01-01");
-  assert.equal(day.dailyBaseAllowanceMinor, 1_000);
-  assert.equal(day.availableTodayMinor, 1_000);
+  assert.equal(day.dailyAllowanceMinor, 1_000);
+  assert.equal(day.availableTodayMinor, 0);
   assert.equal(day.spentTodayMinor, 1_000);
-  assert.equal(day.remainingTodayMinor, 0);
   const next = calculateBudget(data, period, "2026-01-02");
-  assert.equal(next.previousCarryoverMinor, 0);
   assert.equal(next.availableTodayMinor, 1_000);
 });
 
-test("spending nothing carries the full daily allowance forward", () => {
+test("unused funds remain in the period pool and are redistributed over remaining days", () => {
   const data = emptyFinanceData();
   data.income.push({ ...receivedIncome, amountMinor: 30_000 });
   const day = calculateBudget(data, period, "2026-01-01");
-  assert.equal(day.remainingTodayMinor, 1_000);
+  assert.equal(day.availableTodayMinor, 1_000);
   const later = calculateBudget(data, period, "2026-01-04");
-  assert.equal(later.dailyBaseAllowanceMinor, 1_000);
-  assert.equal(later.previousCarryoverMinor, 3_000);
-  assert.equal(later.availableTodayMinor, 4_000);
+  assert.equal(later.dailyAllowanceMinor, 1_111);
+  assert.equal(later.availableTodayMinor, 1_111);
 });
 
-test("daily allowance carries savings forward and reconciles confirmed spending at day end", () => {
+test("today's confirmed daily spending is subtracted once from the allowance", () => {
   const data = emptyFinanceData();
   data.income.push({ ...receivedIncome, amountMinor: 30_000 });
   data.expenses.push(
@@ -140,53 +151,48 @@ test("daily allowance carries savings forward and reconciles confirmed spending 
   );
 
   const today = calculateBudget(data, period, "2026-01-04");
-  assert.equal(today.dailyBaseAllowanceMinor, 1_000);
-  assert.equal(today.previousCarryoverMinor, 3_000);
-  assert.equal(today.availableTodayMinor, 4_000);
+  assert.equal(today.dailyAllowanceMinor, 1_111);
+  assert.equal(today.availableTodayMinor, -1_389);
   assert.equal(today.spentTodayMinor, 2_500);
-  assert.equal(today.remainingTodayMinor, 1_500);
 
   const tomorrow = calculateBudget(data, period, "2026-01-05");
-  assert.equal(tomorrow.previousCarryoverMinor, today.remainingTodayMinor);
-  assert.equal(tomorrow.availableTodayMinor, 2_500);
+  assert.equal(tomorrow.availableTodayMinor, 1_058);
   assert.deepEqual(today, calculateBudget(data, period, "2026-01-04"));
 });
 
-test("overspending creates negative carryover that reduces future available spending", () => {
+test("overspending is included in the actual period remainder for future allowances", () => {
   const data = emptyFinanceData();
   data.income.push({ ...receivedIncome, amountMinor: 120_000 });
   data.expenses.push(
     tx({ id: "mon", amountMinor: 5_000, occurredAt: "2026-01-01T12:00", budgetMode: "DAILY" }),
   );
   const monday = calculateBudget(data, period, "2026-01-01");
-  assert.equal(monday.availableTodayMinor, 4_000);
-  assert.equal(monday.remainingTodayMinor, -1_000);
+  assert.equal(monday.dailyAllowanceMinor, 4_000);
+  assert.equal(monday.availableTodayMinor, -1_000);
 
   data.expenses.push(
     tx({ id: "tue", amountMinor: 2_000, occurredAt: "2026-01-02T12:00", budgetMode: "DAILY" }),
   );
   const tuesday = calculateBudget(data, period, "2026-01-02");
-  assert.equal(tuesday.previousCarryoverMinor, -1_000);
-  assert.equal(tuesday.availableTodayMinor, 3_000);
-  assert.equal(tuesday.remainingTodayMinor, 1_000);
+  assert.equal(tuesday.availableTodayMinor, 1_966);
 
   const wednesday = calculateBudget(data, period, "2026-01-03");
-  assert.equal(wednesday.availableTodayMinor, 5_000);
+  assert.equal(wednesday.availableTodayMinor, 4_036);
 });
 
-test("carryover accumulates across multiple under-spent days", () => {
+test("multiple under-spent days remain available in the actual period pool", () => {
   const data = emptyFinanceData();
   data.income.push({ ...receivedIncome, amountMinor: 120_000 });
   data.expenses.push(
     tx({ id: "mon", amountMinor: 1_000, occurredAt: "2026-01-01T12:00", budgetMode: "DAILY" }),
     tx({ id: "tue", amountMinor: 2_000, occurredAt: "2026-01-02T12:00", budgetMode: "DAILY" }),
   );
-  assert.equal(calculateBudget(data, period, "2026-01-01").remainingTodayMinor, 3_000);
-  assert.equal(calculateBudget(data, period, "2026-01-02").availableTodayMinor, 7_000);
-  assert.equal(calculateBudget(data, period, "2026-01-03").availableTodayMinor, 9_000);
+  assert.equal(calculateBudget(data, period, "2026-01-01").availableTodayMinor, 3_000);
+  assert.equal(calculateBudget(data, period, "2026-01-02").availableTodayMinor, 2_103);
+  assert.equal(calculateBudget(data, period, "2026-01-03").availableTodayMinor, 4_179);
 });
 
-test("daily carryover replays edited and deleted history without duplicating on reload", () => {
+test("historical daily expense edits and deletes recalculate the period pool without persisted carryover", () => {
   const data = emptyFinanceData();
   data.income.push({ ...receivedIncome, amountMinor: 30_000 });
   data.expenses.push(
@@ -200,30 +206,28 @@ test("daily carryover replays edited and deleted history without duplicating on 
   );
 
   const afterHistoricalSpend = calculateBudget(data, period, "2026-01-04");
-  assert.equal(afterHistoricalSpend.dailyBaseAllowanceMinor, 1_000);
-  assert.equal(afterHistoricalSpend.previousCarryoverMinor, 2_500);
-  assert.equal(afterHistoricalSpend.remainingTodayMinor, 1_000);
+  assert.equal(afterHistoricalSpend.dailyAllowanceMinor, 1_093);
+  assert.equal(afterHistoricalSpend.availableTodayMinor, -1_407);
   assert.deepEqual(afterHistoricalSpend, calculateBudget(data, period, "2026-01-04"));
 
   data.expenses = data.expenses.filter((item) => item.id !== "historical");
   const afterDelete = calculateBudget(data, period, "2026-01-04");
-  assert.equal(afterDelete.dailyBaseAllowanceMinor, 1_000);
-  assert.equal(afterDelete.previousCarryoverMinor, 3_000);
-  assert.equal(afterDelete.remainingTodayMinor, 1_500);
+  assert.equal(afterDelete.dailyAllowanceMinor, 1_111);
+  assert.equal(afterDelete.availableTodayMinor, -1_389);
 
   const edited = data.expenses.find((item) => item.id === "today")!;
   edited.amountMinor = 1_000;
   const afterEdit = calculateBudget(data, period, "2026-01-04");
   assert.equal(afterEdit.spentTodayMinor, 1_000);
-  assert.equal(afterEdit.remainingTodayMinor, 3_000);
+  assert.equal(afterEdit.availableTodayMinor, 111);
 });
 
 test("global expenses reduce the period budget and recalculate future daily allowances", () => {
   const data = emptyFinanceData();
   data.income.push({ ...receivedIncome, amountMinor: 30_000 });
   const before = calculateBudget(data, period, "2026-01-08");
-  assert.equal(before.dailyBaseAllowanceMinor, 1_000);
-  assert.equal(before.availableTodayMinor, 8_000);
+  assert.equal(before.dailyAllowanceMinor, 1_304);
+  assert.equal(before.availableTodayMinor, 1_304);
 
   data.expenses.push(
     tx({ id: "rent", amountMinor: 6_000, occurredAt: "2026-01-08T09:00", budgetMode: "GLOBAL" }),
@@ -231,9 +235,23 @@ test("global expenses reduce the period budget and recalculate future daily allo
   const after = calculateBudget(data, period, "2026-01-08");
   assert.equal(after.remainingMinor, 24_000);
   assert.equal(after.spentTodayMinor, 0);
-  assert.ok(after.dailyBaseAllowanceMinor < before.dailyBaseAllowanceMinor);
+  assert.equal(after.dailyAllowanceMinor, 1_043);
   assert.ok(after.availableTodayMinor <= after.remainingMinor);
   assert.ok(after.availableTodayMinor < before.availableTodayMinor);
+});
+
+test("daily and global expenses on the same day each affect the budget exactly once", () => {
+  const data = emptyFinanceData();
+  data.income.push({ ...receivedIncome, amountMinor: 30_000 });
+  data.expenses.push(
+    tx({ id: "daily", amountMinor: 1_000, occurredAt: "2026-01-08T12:00", budgetMode: "DAILY" }),
+    tx({ id: "global", amountMinor: 3_000, occurredAt: "2026-01-08T13:00", budgetMode: "GLOBAL" }),
+  );
+  const result = calculateBudget(data, period, "2026-01-08");
+  assert.equal(result.remainingMinor, 26_000);
+  assert.equal(result.spentTodayMinor, 1_000);
+  assert.equal(result.dailyAllowanceMinor, 1_174);
+  assert.equal(result.availableTodayMinor, 174);
 });
 
 test("refunds restore period funds without counting as daily spending", () => {
@@ -260,7 +278,7 @@ test("changing the salary-period budget recalculates daily availability", () => 
   assert.equal(high.availableTodayMinor, 2_000);
 });
 
-test("crossing into a new calendar day promotes remaining today into carryover", () => {
+test("crossing into a new calendar day recalculates from the unspent period pool", () => {
   const data = emptyFinanceData();
   data.income.push({ ...receivedIncome, amountMinor: 30_000 });
   data.expenses.push(
@@ -268,11 +286,8 @@ test("crossing into a new calendar day promotes remaining today into carryover",
   );
   const evening = calculateBudget(data, period, "2026-01-03");
   const morning = calculateBudget(data, period, "2026-01-04");
-  assert.equal(morning.previousCarryoverMinor, evening.remainingTodayMinor);
-  assert.equal(
-    morning.availableTodayMinor,
-    morning.dailyBaseAllowanceMinor + morning.previousCarryoverMinor,
-  );
+  assert.equal(morning.availableTodayMinor, morning.dailyAllowanceMinor);
+  assert.ok(morning.dailyAllowanceMinor > evening.availableTodayMinor);
 });
 
 test("crossing into a new salary period isolates budgets", () => {
@@ -301,7 +316,7 @@ test("crossing into a new salary period isolates budgets", () => {
   const next = calculateBudget(data, nextPeriod, "2026-01-31");
   assert.ok(previous.confirmedExpensesMinor > 0);
   assert.equal(next.confirmedExpensesMinor, 0);
-  assert.equal(next.availableTodayMinor, Math.trunc(40_000 / 28));
+  assert.equal(next.availableTodayMinor, Math.round(40_000 / 28));
   assert.equal(currentSalaryPeriod(data, "2026-01-31")?.id, nextPeriod.id);
 });
 
@@ -328,7 +343,7 @@ test("budget handles deficit, salary day, and date boundaries", () => {
   data.expenses.push(tx({ amountMinor: 1_000, budgetMode: "GLOBAL" }));
   const negative = calculateBudget(data, period, "2026-01-30");
   assert.equal(negative.remainingMinor, -500);
-  assert.equal(negative.remainingTodayMinor, -500);
+  assert.equal(negative.availableTodayMinor, -500);
   assert.ok(negative.projectedRemainingMinor < 0);
   const salaryDay = calculateBudget(data, period, "2026-01-31");
   assert.equal(salaryDay.daysUntilSalary, 0);
@@ -339,6 +354,59 @@ test("budget handles deficit, salary day, and date boundaries", () => {
     currentSalaryPeriod({ ...data, salaryPeriods: [period] }, "2026-01-30")?.id,
     period.id,
   );
+});
+
+test("daily allowance is zero before a period and on or after its exclusive end date", () => {
+  const data = emptyFinanceData();
+  data.income.push({ ...receivedIncome, amountMinor: 30_000 });
+  const before = calculateBudget(data, period, "2025-12-31");
+  const endsToday = calculateBudget(data, period, "2026-01-31");
+  const expired = calculateBudget(data, period, "2026-02-01");
+  assert.equal(before.dailyAllowanceMinor, 0);
+  assert.equal(endsToday.dailyAllowanceMinor, 0);
+  assert.equal(expired.dailyAllowanceMinor, 0);
+});
+
+test("date-only day counts include today and handle month, year, and leap-day boundaries", () => {
+  assert.equal(dayDifference("2026-12-07", "2027-01-04"), 28);
+  assert.equal(dayDifference("2024-02-28", "2024-03-01"), 2);
+  assert.equal(dayDifference("2026-01-31", "2026-02-01"), 1);
+  assert.equal(dayDifference("2026-01-01", "2026-01-01"), 0);
+});
+
+test("daily allowance handles zero and negative remaining funds without floating point money", () => {
+  assert.deepEqual(calculateDailyAllowance(0, 28, 0), {
+    dailyAllowanceMinor: 0,
+    availableTodayMinor: 0,
+  });
+  assert.deepEqual(calculateDailyAllowance(-1_001, 10, 99), {
+    dailyAllowanceMinor: -100,
+    availableTodayMinor: -199,
+  });
+  assert.deepEqual(calculateDailyAllowance(10_000, 0, 0), {
+    dailyAllowanceMinor: 0,
+    availableTodayMinor: 0,
+  });
+});
+
+test("same-provider expense operations stay in the snapshot and recalculate after reload-style reads", () => {
+  const provider = new MemoryStorageProvider();
+  provider.addSalaryPeriod(period);
+  provider.addIncome({ ...receivedIncome, amountMinor: 30_000 });
+  provider.addExpense(tx({ id: "first", amountMinor: 1_000, budgetMode: "DAILY" }));
+  provider.addExpense(tx({ id: "second", amountMinor: 2_000, budgetMode: "GLOBAL" }));
+  const afterAdd = calculateBudget(provider.getSnapshot(), period, "2026-01-08");
+  assert.equal(afterAdd.remainingMinor, 27_000);
+
+  provider.updateExpense(tx({ id: "second", amountMinor: 3_000, budgetMode: "GLOBAL" }));
+  assert.equal(
+    calculateBudget(provider.getSnapshot(), period, "2026-01-08").remainingMinor,
+    26_000,
+  );
+  provider.deleteExpense("first");
+  const afterDelete = calculateBudget(provider.getSnapshot(), period, "2026-01-08");
+  assert.equal(afterDelete.remainingMinor, 27_000);
+  assert.equal(afterDelete.spentTodayMinor, 0);
 });
 
 test("account balance applies confirmed own-account flows and skips pending transactions", () => {
@@ -508,6 +576,16 @@ test("Android candidate inbox only accepts allowlisted packages and never stores
   assert.equal("text" in inbox.list()[0], false);
   inbox.clear();
   assert.equal(inbox.list().length, 0);
+});
+
+test("Finora deep links resolve only registered internal routes", () => {
+  assert.equal(resolveFinoraDeepLink("com.finora.app://transactions"), "/transactions");
+  assert.equal(resolveFinoraDeepLink("com.finora.app:///settings"), "/settings");
+  assert.equal(resolveFinoraDeepLink("com.finora.app://"), "/");
+  assert.equal(resolveFinoraDeepLink("https://finora.example/transactions"), null);
+  assert.equal(resolveFinoraDeepLink("com.finora.app://unknown"), null);
+  assert.equal(resolveFinoraDeepLink("com.finora.app://transactions?q=secret"), null);
+  assert.equal(resolveFinoraDeepLink("com.finora.app://user@transactions"), null);
 });
 
 test("rendered experience has no seeded identities, financial examples, or external network calls", () => {

@@ -19,6 +19,10 @@
 
 # production
 /build
+/android/**/*.jks
+/android/**/*.keystore
+/android/**/*.p12
+/android/release-signing.properties
 
 # misc
 .DS_Store

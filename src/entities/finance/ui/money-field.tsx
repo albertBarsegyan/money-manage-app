@@ -1,6 +1,5 @@
 "use client";
 
-import { DollarSign } from "lucide-react";
 import { FormField } from "@/shared/ui/form-field";
 import { Input } from "@/shared/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
@@ -12,6 +11,12 @@ const currencyNames: Record<CurrencyCode, string> = {
   USD: "USD",
   EUR: "EUR",
   GBP: "GBP",
+};
+const currencySymbols: Record<CurrencyCode, string> = {
+  AMD: "֏",
+  USD: "$",
+  EUR: "€",
+  GBP: "£",
 };
 
 export function MoneyField({
@@ -35,10 +40,12 @@ export function MoneyField({
     <FormField label={label} error={error}>
       <div className="flex min-w-0 gap-2">
         <div className="relative min-w-0 flex-1">
-          <DollarSign
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+          <span
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"
             aria-hidden="true"
-          />
+          >
+            {currencySymbols[currency]}
+          </span>
           <Input
             id={name}
             name={name}
@@ -59,7 +66,7 @@ export function MoneyField({
           <SelectContent>
             {CURRENCIES.map((item) => (
               <SelectItem key={item} value={item}>
-                {currencyNames[item]}
+                {currencyNames[item]} ({currencySymbols[item]})
               </SelectItem>
             ))}
           </SelectContent>

@@ -53,7 +53,7 @@ export function TransactionsPage({
             />
           </label>
           <button className="primary-button small-primary" onClick={onAdd}>
-            <Icon name="plus" size={15} /> Add expense
+            <Icon name="plus" size={15} /> <span className="hidden lg:block"> Add expense</span>
           </button>
         </div>
       </div>

@@ -21,10 +21,11 @@ import { IncomeFormDialog } from "@/features/manage-income";
 import { SalaryPeriodFormDialog } from "@/features/manage-salary-periods";
 import { TransactionFormDialog } from "@/features/manage-transactions";
 import { ThemeSwitcher } from "@/features/theme-switcher";
+import { PwaInstallButton } from "@/app/providers/pwa-support";
 import { routeTransition, routeVariants } from "@/shared/lib/motion";
 import type { StorageMode } from "@/entities/finance";
 import type { View } from "./finance.types";
-import { amountLabel, Icon } from "./finance-page-shared";
+import { Icon } from "./finance-page-shared";
 import { Overview } from "./overview-page";
 import { IncomePage } from "./income-page";
 import { TransactionsPage } from "./transactions-page";
@@ -206,7 +207,7 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
     ["Integrations", "bank", viewPaths.Integrations],
     ["Settings", "settings", viewPaths.Settings],
   ];
-  const heading = view === "Overview" ? "Your finances" : view;
+  const heading = view === "Overview" ? "Today's budget" : view;
   const pendingCount = data.expenses.filter(
     (item) => item.reviewStatus === "PENDING_REVIEW",
   ).length;
@@ -274,6 +275,7 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
             <b>{view}</b>
           </div>
           <div className="top-actions">
+            <PwaInstallButton />
             <ThemeSwitcher />
           </div>
         </header>
@@ -300,7 +302,9 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
                   </div>
                   <h1>{heading}</h1>
                   {view === "Overview" && (
-                    <p className="subtitle">A clear view of the information you choose to enter.</p>
+                    <p className="subtitle">
+                      See how much you can spend today, then the rest of your period.
+                    </p>
                   )}
                 </div>
                 <div className="heading-actions">

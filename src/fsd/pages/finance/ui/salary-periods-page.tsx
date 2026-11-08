@@ -1,8 +1,4 @@
-import {
-  calculateBudget,
-  type FinanceData,
-  type SalaryPeriod,
-} from "@/entities/finance";
+import { calculateBudget, type FinanceData, type SalaryPeriod } from "@/entities/finance";
 import { amountLabel, displayDate, EmptyState, Icon } from "./finance-page-shared";
 
 export function SalaryPeriodsPage({

@@ -8,7 +8,6 @@ import {
 import type { View } from "./finance.types";
 import {
   amountLabel,
-  currencySymbol,
   daysLabel,
   displayDate,
   sourceLabel,
@@ -16,6 +15,7 @@ import {
   EmptyState,
 } from "./finance-page-shared";
 import { TransactionRows } from "./transaction-rows";
+import { DailySpendingCard } from "./daily-spending-card";
 
 export function Overview({
   data,
@@ -42,98 +42,85 @@ export function Overview({
   return (
     <>
       {activeSalary && summary ? (
-        <section className="overview-grid">
-          <div className="balance-card">
-            <div className="card-top">
-              <span>Remaining this salary period</span>
-              <span className="period-chip">{activeSalary.name}</span>
-            </div>
-            <div className="balance-value">
-              <span className="currency-sign">{currencySymbol(summary.currency)}</span>
-              {amountLabel(Math.abs(summary.remainingMinor), summary.currency).replace(
-                /[^\d,.-]/g,
-                "",
-              )}
-              {summary.remainingMinor < 0 && <span className="over-label">over budget</span>}
-            </div>
-            <div className="balance-foot">
-              <span>
-                {summary.daysUntilSalary
-                  ? `${daysLabel(summary.daysUntilSalary)} until next salary`
-                  : "Salary date is today"}
-              </span>
-              <span>{summary.periodProgress}% of period</span>
-            </div>
-            <div className="period-progress">
-              <i style={{ width: `${summary.periodProgress}%` }} />
-            </div>
-            <div className="budget-breakdown">
-              <span>
-                Salary and confirmed income{" "}
-                <b>{amountLabel(summary.confirmedIncomeMinor, summary.currency)}</b>
-              </span>
-              <span>
-                Confirmed expenses{" "}
-                <b>{amountLabel(summary.confirmedExpensesMinor, summary.currency)}</b>
-              </span>
-              <span>
-                Refunds <b>{amountLabel(summary.refundsMinor, summary.currency)}</b>
-              </span>
-            </div>
-          </div>
-          <div className="side-stats">
-            <div className="stat-card daily-budget-card">
+        <section className="overview-grid" aria-label="Spending overview">
+          <DailySpendingCard
+            summary={summary}
+            periodName={activeSalary.name}
+            onDailyExpense={() => onExpense("DAILY")}
+            onGlobalExpense={() => onExpense("GLOBAL")}
+          />
+          <div className="side-stats period-side-stats">
+            <div className="stat-card">
               <div className="stat-top">
-                <span>Today&apos;s budget</span>
-                <span className="stat-icon mint">↘</span>
+                <span>Remaining this period</span>
+                <span className="stat-icon mint" aria-hidden="true">
+                  ↘
+                </span>
               </div>
-              <div className="daily-budget-breakdown">
-                <div className="daily-budget-row">
-                  <span>Remaining period budget</span>
-                  <b>{amountLabel(summary.remainingMinor, summary.currency)}</b>
-                </div>
-                <div className="daily-budget-row daily-budget-total">
-                  <span>
-                    Daily budget for {daysLabel(Math.max(1, summary.daysUntilSalary))} remaining
-                  </span>
-                  <b>{amountLabel(summary.availableTodayMinor, summary.currency)}</b>
-                </div>
-                <div className="daily-budget-row daily-budget-remaining">
-                  <span>Left to spend today after daily expenses</span>
-                  <b>{amountLabel(summary.remainingTodayMinor, summary.currency)}</b>
-                </div>
-              </div>
+              <b
+                aria-label={`Remaining period budget ${amountLabel(summary.remainingMinor, summary.currency)}`}
+              >
+                {amountLabel(summary.remainingMinor, summary.currency)}
+              </b>
               <small>
-                Daily expenses use today’s allowance. Global expenses recalculate it immediately.
+                {summary.daysUntilSalary
+                  ? `${daysLabel(summary.daysUntilSalary)} until ${displayDate(activeSalary.nextSalaryOn)}`
+                  : "Salary date is today"}
               </small>
-              <div className="daily-expense-actions">
-                <button className="secondary-button" onClick={() => onExpense("DAILY")}>
-                  Add daily expense
-                </button>
-                <button className="primary-button" onClick={() => onExpense("GLOBAL")}>
-                  Add global expense
-                </button>
+              <div
+                className="period-progress period-progress-light"
+                role="progressbar"
+                aria-valuenow={summary.periodProgress}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`${summary.periodProgress}% of salary period elapsed`}
+              >
+                <i style={{ width: `${summary.periodProgress}%` }} />
               </div>
             </div>
             <div className="stat-card">
               <div className="stat-top">
                 <span>Projected at payday</span>
-                <span className="stat-icon lilac">⌁</span>
+                <span className="stat-icon lilac" aria-hidden="true">
+                  ⌁
+                </span>
               </div>
               <b>{amountLabel(summary.projectedRemainingMinor, summary.currency)}</b>
               <small>Based on confirmed period activity</small>
+            </div>
+            <div className="stat-card period-breakdown-card">
+              <div className="stat-top">
+                <span>Period breakdown</span>
+                <span className="period-chip">{activeSalary.name}</span>
+              </div>
+              <div className="period-breakdown-list">
+                <div>
+                  <span>Salary and confirmed income</span>
+                  <b>{amountLabel(summary.confirmedIncomeMinor, summary.currency)}</b>
+                </div>
+                <div>
+                  <span>Confirmed expenses</span>
+                  <b>{amountLabel(summary.confirmedExpensesMinor, summary.currency)}</b>
+                </div>
+                <div>
+                  <span>Refunds</span>
+                  <b>{amountLabel(summary.refundsMinor, summary.currency)}</b>
+                </div>
+              </div>
             </div>
           </div>
         </section>
       ) : (
         <section className="setup-card">
-          <div className="setup-symbol">◷</div>
+          <div className="setup-symbol" aria-hidden="true">
+            ◷
+          </div>
           <div>
             <div className="eyebrow">START WITH YOUR OWN NUMBERS</div>
             <h2>Set up a salary period</h2>
             <p>
               Add your expected salary and pay dates to set a starting budget. Confirmed expenses
-              then reduce it and update your daily budget immediately.
+              then reduce it and update how much you can spend today.
             </p>
             <button className="primary-button" onClick={onSalary}>
               <Icon name="plus" size={16} /> Configure salary period
@@ -146,34 +133,38 @@ export function Overview({
           <div className="eyebrow">QUICK ACTIONS</div>
           <h2>Manage your money</h2>
         </div>
-        <button className="quick-action" onClick={() => onExpense("GLOBAL")}>
-          <span className="quick-icon purple">
-            <Icon name="plus" />
-          </span>
-          <span>
-            <b>Log an expense</b>
-            <small>Add a purchase or bill</small>
-          </span>
-          <Icon name="chevron" size={16} />
-        </button>
-        <button className="quick-action" onClick={onIncome}>
-          <span className="quick-icon green">↙</span>
-          <span>
-            <b>Add income</b>
-            <small>Salary and other income</small>
-          </span>
-          <Icon name="chevron" size={16} />
-        </button>
-        <button className="quick-action" onClick={() => onView("Accounts")}>
-          <span className="quick-icon blue">
-            <Icon name="wallet" />
-          </span>
-          <span>
-            <b>Add an account</b>
-            <small>Track your own accounts</small>
-          </span>
-          <Icon name="chevron" size={16} />
-        </button>
+        <div className="quick-action-list">
+          <button className="quick-action" onClick={() => onExpense("DAILY")}>
+            <span className="quick-icon purple" aria-hidden="true">
+              <Icon name="plus" />
+            </span>
+            <span>
+              <b>Log a daily expense</b>
+              <small>Uses today’s spending allowance</small>
+            </span>
+            <Icon name="chevron" size={16} />
+          </button>
+          <button className="quick-action" onClick={() => onExpense("GLOBAL")}>
+            <span className="quick-icon blue" aria-hidden="true">
+              <Icon name="plus" />
+            </span>
+            <span>
+              <b>Log a global expense</b>
+              <small>Recalculates the period budget</small>
+            </span>
+            <Icon name="chevron" size={16} />
+          </button>
+          <button className="quick-action" onClick={onIncome}>
+            <span className="quick-icon green" aria-hidden="true">
+              ↙
+            </span>
+            <span>
+              <b>Add income</b>
+              <small>Salary and other income</small>
+            </span>
+            <Icon name="chevron" size={16} />
+          </button>
+        </div>
       </section>
       <section className="lower-grid">
         <div className="panel recent-panel">
@@ -210,7 +201,9 @@ export function Overview({
           {expectedIncome.length ? (
             expectedIncome.slice(0, 4).map((item) => (
               <div className="upcoming-row" key={item.id}>
-                <div className="income-symbol">↙</div>
+                <div className="income-symbol" aria-hidden="true">
+                  ↙
+                </div>
                 <div className="upcoming-copy">
                   <b>{item.description}</b>
                   <span>
@@ -236,7 +229,9 @@ export function Overview({
       </section>
       {summary && (
         <section className="period-note">
-          <span className="note-star">✳</span>
+          <span className="note-star" aria-hidden="true">
+            ✳
+          </span>
           <span>
             <b>Pending transactions do not affect your budget.</b> Confirm a transaction after
             reviewing it.

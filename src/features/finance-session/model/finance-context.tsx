@@ -14,6 +14,8 @@ import type {
   ExpenseRecord,
   FinanceData,
   IncomeRecord,
+  MonitoredCardRecord,
+  NotificationReaderSettings,
   SalaryPeriod,
 } from "@/entities/finance";
 import {
@@ -70,6 +72,18 @@ class FinanceSession {
   deleteSalaryPeriod(id: string) {
     this.manager.activeProvider.deleteSalaryPeriod(id);
   }
+  addMonitoredCard(record: MonitoredCardRecord) {
+    this.manager.activeProvider.addMonitoredCard(record);
+  }
+  updateMonitoredCard(record: MonitoredCardRecord) {
+    this.manager.activeProvider.updateMonitoredCard(record);
+  }
+  deleteMonitoredCard(id: string) {
+    this.manager.activeProvider.deleteMonitoredCard(id);
+  }
+  updateNotificationReaderSettings(settings: NotificationReaderSettings) {
+    this.manager.activeProvider.updateNotificationReaderSettings(settings);
+  }
   clearAllData() {
     this.manager.activeProvider.clearAllData();
   }
@@ -78,7 +92,14 @@ class FinanceSession {
   }
 }
 
-const EMPTY_DATA: FinanceData = { income: [], expenses: [], accounts: [], salaryPeriods: [] };
+const EMPTY_DATA: FinanceData = {
+  income: [],
+  expenses: [],
+  accounts: [],
+  salaryPeriods: [],
+  monitoredCards: [],
+  notificationReader: { enabled: false, selectedPackages: [] },
+};
 interface FinanceContextValue {
   data: FinanceData;
   session: FinanceSession;

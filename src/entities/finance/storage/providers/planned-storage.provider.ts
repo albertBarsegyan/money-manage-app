@@ -8,6 +8,8 @@ import type {
   ExpenseRecord,
   FinanceData,
   IncomeRecord,
+  MonitoredCardRecord,
+  NotificationReaderSettings,
   SalaryPeriod,
 } from "../../models";
 
@@ -79,6 +81,24 @@ export class PlannedStorageProvider implements FutureStorageProvider {
     return unavailable();
   }
   deleteSalaryPeriod(_id: string): void {
+    return unavailable();
+  }
+  getMonitoredCards(): MonitoredCardRecord[] {
+    return unavailable();
+  }
+  addMonitoredCard(_record: MonitoredCardRecord): void {
+    return unavailable();
+  }
+  updateMonitoredCard(_record: MonitoredCardRecord): void {
+    return unavailable();
+  }
+  deleteMonitoredCard(_id: string): void {
+    return unavailable();
+  }
+  getNotificationReaderSettings(): NotificationReaderSettings {
+    return unavailable();
+  }
+  updateNotificationReaderSettings(_settings: NotificationReaderSettings): void {
     return unavailable();
   }
   clearAllData(): void {

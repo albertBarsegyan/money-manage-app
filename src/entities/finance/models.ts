@@ -8,6 +8,7 @@ export type TransactionSource =
   "MANUAL" | "BANK_SYNC" | "WALLET_SYNC" | "CSV_IMPORT" | "PAYMENT_PROVIDER";
 export type TransactionReviewStatus = "PENDING_REVIEW" | "CONFIRMED" | "REJECTED";
 export type AccountType = "CASH" | "CHECKING" | "SAVINGS" | "CREDIT" | "OTHER";
+export type MonitoredCardType = "DEBIT" | "CREDIT" | "PREPAID" | "ACCOUNT";
 export type ExpenseBudgetMode = "DAILY" | "GLOBAL";
 
 /** Money is stored as integer minor units (for example cents), never binary floating point. */
@@ -57,6 +58,23 @@ export interface AccountRecord {
   openingBalanceMinor: number;
 }
 
+/** Only non-sensitive card metadata is kept; never store a full PAN, CVV, or PIN. */
+export interface MonitoredCardRecord {
+  id: string;
+  name: string;
+  bankName: string;
+  type: MonitoredCardType;
+  lastFour?: string;
+  currency: CurrencyCode;
+  accountId?: string;
+  monitoringEnabled: boolean;
+}
+
+export interface NotificationReaderSettings {
+  enabled: boolean;
+  selectedPackages: string[];
+}
+
 export interface SalaryPeriod {
   id: string;
   name: string;
@@ -72,6 +90,8 @@ export interface FinanceData {
   expenses: ExpenseRecord[];
   accounts: AccountRecord[];
   salaryPeriods: SalaryPeriod[];
+  monitoredCards: MonitoredCardRecord[];
+  notificationReader: NotificationReaderSettings;
 }
 
 export const emptyFinanceData = (): FinanceData => ({
@@ -79,4 +99,6 @@ export const emptyFinanceData = (): FinanceData => ({
   expenses: [],
   accounts: [],
   salaryPeriods: [],
+  monitoredCards: [],
+  notificationReader: { enabled: false, selectedPackages: [] },
 });

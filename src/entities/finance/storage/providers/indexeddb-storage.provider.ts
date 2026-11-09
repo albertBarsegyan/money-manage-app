@@ -4,6 +4,7 @@ import {
   validateAccount,
   validateExpense,
   validateIncome,
+  validateMonitoredCard,
   validateSalaryPeriod,
 } from "../../validation";
 import { MemoryStorageProvider } from "./memory-storage.provider";
@@ -52,6 +53,8 @@ export class IndexedDbStorageProvider implements StorageProvider {
   getExpenses = () => this.cache.getExpenses();
   getAccounts = () => this.cache.getAccounts();
   getSalaryPeriods = () => this.cache.getSalaryPeriods();
+  getMonitoredCards = () => this.cache.getMonitoredCards();
+  getNotificationReaderSettings = () => this.cache.getNotificationReaderSettings();
 
   initialize(): Promise<void> {
     if (!this.initialization) {
@@ -127,6 +130,24 @@ export class IndexedDbStorageProvider implements StorageProvider {
   }
   deleteSalaryPeriod(id: string) {
     this.cache.deleteSalaryPeriod(id);
+    this.persist();
+  }
+  addMonitoredCard(record: Parameters<StorageProvider["addMonitoredCard"]>[0]) {
+    this.cache.addMonitoredCard(record);
+    this.persist();
+  }
+  updateMonitoredCard(record: Parameters<StorageProvider["updateMonitoredCard"]>[0]) {
+    this.cache.updateMonitoredCard(record);
+    this.persist();
+  }
+  deleteMonitoredCard(id: string) {
+    this.cache.deleteMonitoredCard(id);
+    this.persist();
+  }
+  updateNotificationReaderSettings(
+    settings: Parameters<StorageProvider["updateNotificationReaderSettings"]>[0],
+  ) {
+    this.cache.updateNotificationReaderSettings(settings);
     this.persist();
   }
   clearAllData() {
@@ -251,6 +272,11 @@ function cloneData(data: FinanceData): FinanceData {
     expenses: data.expenses.map((item) => ({ ...item })),
     accounts: data.accounts.map((item) => ({ ...item })),
     salaryPeriods: data.salaryPeriods.map((item) => ({ ...item })),
+    monitoredCards: (data.monitoredCards ?? []).map((item) => ({ ...item })),
+    notificationReader: {
+      enabled: data.notificationReader?.enabled ?? false,
+      selectedPackages: [...(data.notificationReader?.selectedPackages ?? [])],
+    },
   };
 }
 
@@ -261,16 +287,28 @@ function isFinanceData(value: unknown): value is FinanceData {
     !Array.isArray(data.income) ||
     !Array.isArray(data.expenses) ||
     !Array.isArray(data.accounts) ||
-    !Array.isArray(data.salaryPeriods)
+    !Array.isArray(data.salaryPeriods) ||
+    (data.monitoredCards !== undefined && !Array.isArray(data.monitoredCards))
   )
     return false;
   if (
     data.income.some((item) => validateIncome(item).length > 0) ||
     data.expenses.some((item) => validateExpense(item).length > 0) ||
     data.accounts.some((item) => validateAccount(item).length > 0) ||
-    data.salaryPeriods.some((item) => validateSalaryPeriod(item).length > 0)
+    data.salaryPeriods.some((item) => validateSalaryPeriod(item).length > 0) ||
+    (data.monitoredCards ?? []).some((item) => validateMonitoredCard(item).length > 0) ||
+    (data.notificationReader !== undefined &&
+      (typeof data.notificationReader.enabled !== "boolean" ||
+        !Array.isArray(data.notificationReader.selectedPackages) ||
+        data.notificationReader.selectedPackages.some((item) => typeof item !== "string")))
   )
     return false;
-  const groups = [data.income, data.expenses, data.accounts, data.salaryPeriods];
+  const groups = [
+    data.income,
+    data.expenses,
+    data.accounts,
+    data.salaryPeriods,
+    data.monitoredCards ?? [],
+  ];
   return groups.every((group) => new Set(group.map((item) => item.id)).size === group.length);
 }

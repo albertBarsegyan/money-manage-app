@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Menu, X } from "lucide-react";
+import { App } from "@capacitor/app";
 import { AnimatePresence, motion } from "motion/react";
 import {
   calculateBudget,
@@ -35,8 +36,13 @@ import { AnalyticsPage } from "./analytics-page";
 import { IntegrationsPage } from "./integrations-page";
 import { SettingsPage } from "./settings-page";
 import { SalaryPeriodsPage } from "./salary-periods-page";
+import {
+  notificationReader,
+  ReaderTransactionDialog,
+  type DetectedTransaction,
+} from "@/features/integrations";
 
-type Dialog = "income" | "expense" | "account" | "salary" | null;
+type Dialog = "income" | "expense" | "account" | "salary" | "reader" | null;
 const viewPaths = {
   Overview: "/",
   Transactions: "/transactions",
@@ -48,8 +54,13 @@ const viewPaths = {
   Settings: "/settings",
 } as const satisfies Record<View, string>;
 
+function normalizeRoutePath(pathname: string) {
+  const withoutTrailingSlash = pathname.replace(/\/+$/, "");
+  return withoutTrailingSlash || "/";
+}
+
 function viewForPath(pathname: string): View {
-  switch (pathname) {
+  switch (normalizeRoutePath(pathname)) {
     case "/transactions":
       return "Transactions";
     case "/income":
@@ -102,10 +113,77 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
   const [expenseBudgetMode, setExpenseBudgetMode] = useState<ExpenseBudgetMode>("GLOBAL");
   const [editingAccount, setEditingAccount] = useState<AccountRecord | undefined>();
   const [editingSalary, setEditingSalary] = useState<SalaryPeriod | undefined>();
+  const [detectedTransactions, setDetectedTransactions] = useState<DetectedTransaction[]>([]);
+  const [reviewCandidate, setReviewCandidate] = useState<DetectedTransaction>();
+  const autoPromptedCandidates = useRef(new Set<string>());
   const query = routeSearch.get("q") ?? "";
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const today = useSyncExternalStore(subscribeToDate, localDate, serverDate);
+  useEffect(() => {
+    if (!notificationReader.isAvailable()) return;
+    let active = true;
+    let transactionListener: { remove: () => Promise<void> } | undefined;
+    let appStateListener: { remove: () => Promise<void> } | undefined;
+    const refreshPending = async () => {
+      const result = await notificationReader
+        .getPendingCandidates()
+        .catch(() => ({ candidates: [] }));
+      if (!active) return;
+      setDetectedTransactions((current) => {
+        const merged = new Map(current.map((candidate) => [candidate.id, candidate]));
+        for (const candidate of result.candidates) merged.set(candidate.id, candidate);
+        return [...merged.values()].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
+      });
+    };
+    void refreshPending();
+    void notificationReader
+      .addListener((candidate) => {
+        if (!active) return;
+        setDetectedTransactions((current) => [
+          candidate,
+          ...current.filter((item) => item.id !== candidate.id),
+        ]);
+      })
+      .then((handle) => {
+        if (active) transactionListener = handle;
+        else void handle.remove();
+      })
+      .catch((reason: unknown) => {
+        console.error("Could not subscribe to transaction reader events.", reason);
+      });
+    void App.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) void refreshPending();
+    }).then((handle) => {
+      if (active) appStateListener = handle;
+      else void handle.remove();
+    });
+    return () => {
+      active = false;
+      void transactionListener?.remove();
+      void appStateListener?.remove();
+    };
+  }, []);
+  useEffect(() => {
+    if (!notificationReader.isAvailable()) return;
+    void Promise.all([
+      notificationReader.setMonitoringEnabled(data.notificationReader.enabled),
+      notificationReader.setSelectedPackages(data.notificationReader.selectedPackages),
+      notificationReader.setMonitoredCards(data.monitoredCards),
+    ]).catch((reason: unknown) => {
+      console.error("Could not sync local notification reader settings.", reason);
+    });
+  }, [data.monitoredCards, data.notificationReader]);
+  useEffect(() => {
+    if (dialog !== null) return;
+    const next = detectedTransactions.find(
+      (candidate) => !autoPromptedCandidates.current.has(candidate.id),
+    );
+    if (!next) return;
+    autoPromptedCandidates.current.add(next.id);
+    setReviewCandidate(next);
+    setDialog("reader");
+  }, [detectedTransactions, dialog]);
   useEffect(() => {
     if (!mobileNavOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -205,6 +283,12 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
     )
       return;
     session.clearAllData();
+    if (notificationReader.isAvailable())
+      void notificationReader.clearPendingCandidates().catch((reason: unknown) => {
+        console.error("Could not clear pending transaction notifications.", reason);
+      });
+    setDetectedTransactions([]);
+    setReviewCandidate(undefined);
     setDialog(null);
     setEditingIncome(undefined);
     setEditingExpense(undefined);
@@ -216,6 +300,38 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
   const handleStorageMode = (mode: StorageMode) => {
     try {
       session.selectStorageMode(mode);
+    } catch (reason) {
+      showError(reason);
+    }
+  };
+  const dismissDetectedTransaction = async (candidate: DetectedTransaction) => {
+    try {
+      if (notificationReader.isAvailable()) await notificationReader.dismissCandidate(candidate.id);
+      setDetectedTransactions((current) => current.filter((item) => item.id !== candidate.id));
+      if (reviewCandidate?.id === candidate.id) {
+        setReviewCandidate(undefined);
+        setDialog(null);
+      }
+    } catch (reason) {
+      showError(reason);
+    }
+  };
+  const reviewDetectedTransaction = (candidate: DetectedTransaction) => {
+    autoPromptedCandidates.current.add(candidate.id);
+    setReviewCandidate(candidate);
+    setDialog("reader");
+  };
+  const saveDetectedTransaction = async (record: ExpenseRecord) => {
+    if (!reviewCandidate) return;
+    try {
+      const candidate = reviewCandidate;
+      if (!data.expenses.some((item) => item.externalReference === candidate.id))
+        session.addExpense(record);
+      if (notificationReader.isAvailable()) await notificationReader.dismissCandidate(candidate.id);
+      setDetectedTransactions((current) => current.filter((item) => item.id !== candidate.id));
+      setReviewCandidate(undefined);
+      setDialog(null);
+      flash("Detected transaction confirmed and saved");
     } catch (reason) {
       showError(reason);
     }
@@ -281,7 +397,7 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
               key={item}
               href={path}
               className={`nav-item ${view === item ? "active" : ""}`}
-              aria-current={pathname === path ? "page" : undefined}
+              aria-current={normalizeRoutePath(pathname) === path ? "page" : undefined}
               onClick={() => setMobileNavOpen(false)}
             >
               <Icon name={icon} />
@@ -529,6 +645,14 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
                   mode={storageMode}
                   providers={storageProviders}
                   salaryPeriods={data.salaryPeriods}
+                  accounts={data.accounts}
+                  monitoredCards={data.monitoredCards}
+                  notificationReader={data.notificationReader}
+                  detectedTransactions={detectedTransactions}
+                  recentReaderTransactions={data.expenses
+                    .filter((item) => item.source === "BANK_SYNC" || item.source === "WALLET_SYNC")
+                    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+                    .slice(0, 5)}
                   onMode={handleStorageMode}
                   onClear={clearSession}
                   onSalary={() => openSalary()}
@@ -541,6 +665,42 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
                       showError(reason);
                     }
                   }}
+                  onReaderSettings={(settings) => {
+                    try {
+                      session.updateNotificationReaderSettings(settings);
+                    } catch (reason) {
+                      showError(reason);
+                    }
+                  }}
+                  onAddMonitoredCard={(card) => {
+                    try {
+                      session.addMonitoredCard(card);
+                      flash("Card added to notification reader");
+                    } catch (reason) {
+                      showError(reason);
+                    }
+                  }}
+                  onEditMonitoredCard={(card) => {
+                    try {
+                      session.updateMonitoredCard(card);
+                      flash("Card settings updated");
+                    } catch (reason) {
+                      showError(reason);
+                    }
+                  }}
+                  onDeleteMonitoredCard={(card) => {
+                    if (!window.confirm(`Remove ${card.name} from notification matching?`)) return;
+                    try {
+                      session.deleteMonitoredCard(card.id);
+                      flash("Monitored card removed");
+                    } catch (reason) {
+                      showError(reason);
+                    }
+                  }}
+                  onReviewDetectedTransaction={reviewDetectedTransaction}
+                  onDismissDetectedTransaction={(candidate) =>
+                    void dismissDetectedTransaction(candidate)
+                  }
                 />
               )}
             </motion.div>
@@ -625,6 +785,19 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
               showError(reason);
             }
           }}
+        />
+      )}
+      {dialog === "reader" && reviewCandidate && (
+        <ReaderTransactionDialog
+          candidate={reviewCandidate}
+          cards={data.monitoredCards}
+          accounts={data.accounts}
+          onClose={() => {
+            setReviewCandidate(undefined);
+            setDialog(null);
+          }}
+          onIgnore={() => void dismissDetectedTransaction(reviewCandidate)}
+          onSave={(record) => void saveDetectedTransaction(record)}
         />
       )}
     </div>

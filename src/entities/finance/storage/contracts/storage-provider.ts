@@ -3,6 +3,8 @@ import type {
   ExpenseRecord,
   FinanceData,
   IncomeRecord,
+  MonitoredCardRecord,
+  NotificationReaderSettings,
   SalaryPeriod,
 } from "../../models";
 
@@ -37,6 +39,12 @@ export interface StorageProvider {
   addSalaryPeriod(record: SalaryPeriod): void;
   updateSalaryPeriod(record: SalaryPeriod): void;
   deleteSalaryPeriod(id: string): void;
+  getMonitoredCards(): MonitoredCardRecord[];
+  addMonitoredCard(record: MonitoredCardRecord): void;
+  updateMonitoredCard(record: MonitoredCardRecord): void;
+  deleteMonitoredCard(id: string): void;
+  getNotificationReaderSettings(): NotificationReaderSettings;
+  updateNotificationReaderSettings(settings: NotificationReaderSettings): void;
   clearAllData(): void;
 }
 

@@ -24,6 +24,7 @@ import {
   type IncomeRecord,
   type SalaryPeriod,
 } from "../src/entities/finance/models";
+import { validateMonitoredCard } from "../src/entities/finance/validation";
 import { MemoryStorageProvider } from "../src/entities/finance/storage/providers/memory-storage.provider";
 import { IndexedDbStorageProvider } from "../src/entities/finance/storage/providers/indexeddb-storage.provider";
 import { StorageManager } from "../src/entities/finance/storage/storage-manager";
@@ -574,8 +575,52 @@ test("Android candidate inbox only accepts allowlisted packages and never stores
   );
   assert.equal(inbox.list().length, 1);
   assert.equal("text" in inbox.list()[0], false);
+  inbox.receive(
+    {
+      packageName: "wallet.app",
+      title: "Card payment",
+      text: "OTP 123456 amount 15",
+      receivedAt: "2026-01-10T12:00:00",
+    },
+    new Set(["wallet.app"]),
+    parser,
+  );
+  assert.equal(inbox.list().length, 1);
   inbox.clear();
   assert.equal(inbox.list().length, 0);
+});
+
+test("monitored cards accept only last-four metadata and link to a same-currency account", () => {
+  const provider = new MemoryStorageProvider();
+  provider.addAccount({
+    id: "bank-account",
+    name: "Everyday account",
+    type: "CHECKING",
+    currency: "AMD",
+    openingBalanceMinor: 0,
+  });
+  const card = {
+    id: "debit-card",
+    name: "Everyday debit",
+    bankName: "Local Bank",
+    type: "DEBIT" as const,
+    lastFour: "1234",
+    currency: "AMD" as const,
+    accountId: "bank-account",
+    monitoringEnabled: true,
+  };
+  provider.addMonitoredCard(card);
+  assert.equal(provider.getMonitoredCards()[0].id, card.id);
+  provider.updateMonitoredCard({ ...card, monitoringEnabled: false });
+  assert.equal(provider.getMonitoredCards()[0].monitoringEnabled, false);
+  assert.throws(
+    () => provider.updateMonitoredCard({ ...card, lastFour: "1234567890123456" }),
+    /last four digits/,
+  );
+  assert.throws(() => provider.updateMonitoredCard({ ...card, currency: "USD" }), /same currency/);
+  provider.deleteMonitoredCard(card.id);
+  assert.equal(provider.getMonitoredCards().length, 0);
+  assert.deepEqual(validateMonitoredCard({ ...card, lastFour: undefined }), []);
 });
 
 test("Finora deep links resolve only registered internal routes", () => {

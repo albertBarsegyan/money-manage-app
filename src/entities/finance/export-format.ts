@@ -9,6 +9,7 @@ import {
   validateAccount,
   validateExpense,
   validateIncome,
+  validateMonitoredCard,
   validateSalaryPeriod,
 } from "./validation";
 
@@ -33,7 +34,14 @@ export function createExportEnvelope(data: FinanceData, exportedAt: string): Fin
 /** Validate untrusted imported JSON into a preview. This function never mutates a provider. */
 export function previewImport(raw: unknown, existing: FinanceData): ImportPreview {
   const empty = (): ImportPreview => ({
-    records: { income: [], expenses: [], accounts: [], salaryPeriods: [] },
+    records: {
+      income: [],
+      expenses: [],
+      accounts: [],
+      salaryPeriods: [],
+      monitoredCards: [],
+      notificationReader: { enabled: false, selectedPackages: [] },
+    },
     duplicates: [],
     errors: [],
   });
@@ -60,15 +68,17 @@ export function previewImport(raw: unknown, existing: FinanceData): ImportPrevie
     expenses: new Set(existing.expenses.map((item) => item.id)),
     accounts: new Set(existing.accounts.map((item) => item.id)),
     salaryPeriods: new Set(existing.salaryPeriods.map((item) => item.id)),
+    monitoredCards: new Set(existing.monitoredCards.map((item) => item.id)),
   };
   const seen = {
     income: new Set<string>(),
     expenses: new Set<string>(),
     accounts: new Set<string>(),
     salaryPeriods: new Set<string>(),
+    monitoredCards: new Set<string>(),
   };
   const add = <T extends { id: string }>(
-    key: keyof FinanceData,
+    key: "income" | "expenses" | "accounts" | "salaryPeriods" | "monitoredCards",
     value: unknown,
     target: T[],
     validate: (record: T) => string[],
@@ -98,6 +108,19 @@ export function previewImport(raw: unknown, existing: FinanceData): ImportPrevie
     add<SalaryPeriod>("salaryPeriods", item, preview.records.salaryPeriods, validateSalaryPeriod);
   for (const item of data.accounts as unknown[])
     add<AccountRecord>("accounts", item, preview.records.accounts, validateAccount);
+  if (Array.isArray(data.monitoredCards))
+    for (const item of data.monitoredCards as unknown[])
+      add("monitoredCards", item, preview.records.monitoredCards, validateMonitoredCard);
+  if (
+    isObject(data.notificationReader) &&
+    typeof data.notificationReader.enabled === "boolean" &&
+    Array.isArray(data.notificationReader.selectedPackages) &&
+    data.notificationReader.selectedPackages.every((item) => typeof item === "string")
+  )
+    preview.records.notificationReader = {
+      enabled: data.notificationReader.enabled,
+      selectedPackages: [...new Set(data.notificationReader.selectedPackages as string[])],
+    };
   detectContentDuplicates(preview.records, existing, preview.duplicates);
   validateReferences(preview.records, existing, errors);
   preview.errors.push(...errors);
@@ -163,6 +186,18 @@ function detectContentDuplicates(
         "|",
       ),
   );
+  imported.monitoredCards = scan(
+    "monitoredCards",
+    existing.monitoredCards,
+    imported.monitoredCards,
+    (item) =>
+      [
+        item.name.trim().toLocaleLowerCase(),
+        item.bankName.trim().toLocaleLowerCase(),
+        item.lastFour || "",
+        item.currency,
+      ].join("|"),
+  );
 }
 
 function validateReferences(imported: FinanceData, existing: FinanceData, errors: string[]) {
@@ -193,6 +228,12 @@ function validateReferences(imported: FinanceData, existing: FinanceData, errors
         `expenses:${item.id}: salary period reference is missing or has another currency.`,
       );
   }
+  for (const card of [...existing.monitoredCards, ...imported.monitoredCards]) {
+    if (card.accountId && accounts.get(card.accountId)?.currency !== card.currency)
+      errors.push(
+        `monitoredCards:${card.id}: account reference is missing or has another currency.`,
+      );
+  }
   const allPeriods = [...existing.salaryPeriods, ...imported.salaryPeriods];
   for (let index = 0; index < allPeriods.length; index++)
     for (let next = index + 1; next < allPeriods.length; next++) {
@@ -216,5 +257,10 @@ function cloneFinanceData(data: FinanceData): FinanceData {
     expenses: data.expenses.map((item) => ({ ...item })),
     accounts: data.accounts.map((item) => ({ ...item })),
     salaryPeriods: data.salaryPeriods.map((item) => ({ ...item })),
+    monitoredCards: (data.monitoredCards ?? []).map((item) => ({ ...item })),
+    notificationReader: {
+      enabled: data.notificationReader?.enabled ?? false,
+      selectedPackages: [...(data.notificationReader?.selectedPackages ?? [])],
+    },
   };
 }

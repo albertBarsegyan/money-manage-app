@@ -1,3 +1,4 @@
+import { motion } from "motion/react";
 import {
   calculateBudget,
   type FinanceData,
@@ -17,6 +18,23 @@ import {
 } from "./finance-page-shared";
 import { TransactionRows } from "./transaction-rows";
 import { DailySpendingCard } from "./daily-spending-card";
+
+const overviewStagger = {
+  hidden: {},
+  visible: {
+    transition: { delayChildren: 0.12, staggerChildren: 0.09 },
+  },
+};
+
+const overviewItem = {
+  hidden: { opacity: 0, y: 18, scale: 0.985 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.48, ease: [0.22, 1, 0.36, 1] as const },
+  },
+};
 
 export function Overview({
   data,
@@ -49,9 +67,18 @@ export function Overview({
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
     .slice(0, 5);
   return (
-    <>
+    <motion.div
+      className="overview-entrance"
+      variants={overviewStagger}
+      initial="hidden"
+      animate="visible"
+    >
       {activeSalary && summary ? (
-        <section className="overview-grid" aria-label="Spending overview">
+        <motion.section
+          variants={overviewItem}
+          className="overview-grid"
+          aria-label="Spending overview"
+        >
           <DailySpendingCard
             summary={summary}
             periodName={activeSalary.name}
@@ -118,9 +145,9 @@ export function Overview({
               </div>
             </div>
           </div>
-        </section>
+        </motion.section>
       ) : (
-        <section className="setup-card">
+        <motion.section variants={overviewItem} className="setup-card">
           <div className="setup-symbol" aria-hidden="true">
             ◷
           </div>
@@ -135,9 +162,9 @@ export function Overview({
               <Icon name="plus" size={16} /> Configure salary period
             </button>
           </div>
-        </section>
+        </motion.section>
       )}
-      <section className="quick-actions">
+      <motion.section variants={overviewItem} className="quick-actions">
         <div>
           <div className="eyebrow">QUICK ACTIONS</div>
           <h2>Manage your money</h2>
@@ -174,8 +201,8 @@ export function Overview({
             <Icon name="chevron" size={16} />
           </button>
         </div>
-      </section>
-      <section className="lower-grid">
+      </motion.section>
+      <motion.section variants={overviewItem} className="lower-grid">
         <div className="panel recent-panel">
           <div className="panel-heading">
             <div>
@@ -242,9 +269,9 @@ export function Overview({
             Manage income <Icon name="chevron" size={14} />
           </button>
         </div>
-      </section>
+      </motion.section>
       {summary && (
-        <section className="period-note">
+        <motion.section variants={overviewItem} className="period-note">
           <span className="note-star" aria-hidden="true">
             ✳
           </span>
@@ -255,8 +282,8 @@ export function Overview({
           <button onClick={() => onView("Transactions")}>
             Review activity <Icon name="chevron" size={14} />
           </button>
-        </section>
+        </motion.section>
       )}
-    </>
+    </motion.div>
   );
 }

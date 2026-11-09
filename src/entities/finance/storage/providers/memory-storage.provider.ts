@@ -3,6 +3,8 @@ import type {
   ExpenseRecord,
   FinanceData,
   IncomeRecord,
+  MonitoredCardRecord,
+  NotificationReaderSettings,
   SalaryPeriod,
 } from "../../models";
 import { emptyFinanceData } from "../../models";
@@ -10,6 +12,7 @@ import {
   validateAccount,
   validateExpense,
   validateIncome,
+  validateMonitoredCard,
   validateSalaryPeriod,
 } from "../../validation";
 import type { StorageCapabilities, StorageProvider } from "../contracts/storage-provider";
@@ -39,6 +42,8 @@ export class MemoryStorageProvider implements StorageProvider {
   getExpenses = () => this.data.expenses;
   getAccounts = () => this.data.accounts;
   getSalaryPeriods = () => this.data.salaryPeriods;
+  getMonitoredCards = () => this.data.monitoredCards;
+  getNotificationReaderSettings = () => this.data.notificationReader;
 
   addIncome(record: IncomeRecord) {
     this.assertValid(validateIncome(record));
@@ -110,6 +115,10 @@ export class MemoryStorageProvider implements StorageProvider {
       this.data.income.some((item) => item.accountId === id)
     )
       throw new Error("This account is used by a record. Reassign or remove those records first.");
+    if (this.data.monitoredCards.some((card) => card.accountId === id))
+      throw new Error(
+        "This account is linked to a monitored card. Edit or remove that card first.",
+      );
     this.commit({ ...this.data, accounts: this.data.accounts.filter((item) => item.id !== id) });
   }
   addSalaryPeriod(record: SalaryPeriod) {
@@ -153,6 +162,44 @@ export class MemoryStorageProvider implements StorageProvider {
       salaryPeriods: this.data.salaryPeriods.filter((item) => item.id !== id),
     });
   }
+  addMonitoredCard(record: MonitoredCardRecord) {
+    this.assertValid(validateMonitoredCard(record));
+    this.assertUnique(this.data.monitoredCards, record.id);
+    this.assertCardReferences(record);
+    this.commit({ ...this.data, monitoredCards: [...this.data.monitoredCards, { ...record }] });
+  }
+  updateMonitoredCard(record: MonitoredCardRecord) {
+    this.assertValid(validateMonitoredCard(record));
+    this.assertExists(this.data.monitoredCards, record.id);
+    this.assertCardReferences(record);
+    this.commit({
+      ...this.data,
+      monitoredCards: this.data.monitoredCards.map((item) =>
+        item.id === record.id ? { ...record } : item,
+      ),
+    });
+  }
+  deleteMonitoredCard(id: string) {
+    this.commit({
+      ...this.data,
+      monitoredCards: this.data.monitoredCards.filter((item) => item.id !== id),
+    });
+  }
+  updateNotificationReaderSettings(settings: NotificationReaderSettings) {
+    if (
+      typeof settings.enabled !== "boolean" ||
+      !Array.isArray(settings.selectedPackages) ||
+      settings.selectedPackages.some((item) => typeof item !== "string" || !item.trim())
+    )
+      throw new Error("Notification reader settings are malformed.");
+    this.commit({
+      ...this.data,
+      notificationReader: {
+        enabled: settings.enabled,
+        selectedPackages: [...new Set(settings.selectedPackages)],
+      },
+    });
+  }
   clearAllData() {
     this.commit(emptyFinanceData());
   }
@@ -162,6 +209,8 @@ export class MemoryStorageProvider implements StorageProvider {
       expenses: [...data.expenses],
       accounts: [...data.accounts],
       salaryPeriods: [...data.salaryPeriods],
+      monitoredCards: [...(data.monitoredCards ?? [])],
+      notificationReader: data.notificationReader ?? { enabled: false, selectedPackages: [] },
     });
   }
 
@@ -181,6 +230,12 @@ export class MemoryStorageProvider implements StorageProvider {
         item.startsOn < period.nextSalaryOn,
     );
     if (overlaps) throw new Error("Salary periods in the same currency cannot overlap.");
+  }
+  private assertCardReferences(record: MonitoredCardRecord) {
+    const account =
+      record.accountId && this.data.accounts.find((item) => item.id === record.accountId);
+    if (record.accountId && (!account || account.currency !== record.currency))
+      throw new Error("Choose an existing account with the same currency, or leave it unlinked.");
   }
   private assertIncomeReferences(record: IncomeRecord) {
     if (record.accountId) {

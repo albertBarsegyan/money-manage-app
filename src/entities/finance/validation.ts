@@ -3,6 +3,7 @@ import type {
   CurrencyCode,
   ExpenseRecord,
   IncomeRecord,
+  MonitoredCardRecord,
   SalaryPeriod,
 } from "./models";
 
@@ -68,6 +69,23 @@ export function validateAccount(input: AccountRecord): string[] {
     errors.push("Opening balance must use integer minor units.");
   if (!["CASH", "CHECKING", "SAVINGS", "CREDIT", "OTHER"].includes(input.type))
     errors.push("Choose a supported account type.");
+  return errors;
+}
+
+export function validateMonitoredCard(input: MonitoredCardRecord): string[] {
+  if (!isRecord(input)) return ["Monitored card record is malformed."];
+  const errors: string[] = [];
+  if (typeof input.id !== "string" || !input.id.trim()) errors.push("Card id is required.");
+  if (typeof input.name !== "string" || !input.name.trim()) errors.push("Card name is required.");
+  if (typeof input.bankName !== "string") errors.push("Bank name must be a string.");
+  if (!["DEBIT", "CREDIT", "PREPAID", "ACCOUNT"].includes(input.type))
+    errors.push("Choose a supported card type.");
+  if (input.lastFour !== undefined && !/^\d{4}$/.test(input.lastFour))
+    errors.push("Enter only the last four digits.");
+  if (!isCurrency(input.currency)) errors.push("Choose a supported currency.");
+  if (input.accountId !== undefined && typeof input.accountId !== "string")
+    errors.push("Account reference must be a string.");
+  if (typeof input.monitoringEnabled !== "boolean") errors.push("Choose a monitoring setting.");
   return errors;
 }
 

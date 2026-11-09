@@ -1,4 +1,12 @@
-import type { SalaryPeriod } from "@/entities/finance";
+import type {
+  AccountRecord,
+  ExpenseRecord,
+  MonitoredCardRecord,
+  NotificationReaderSettings,
+  SalaryPeriod,
+} from "@/entities/finance";
+import type { DetectedTransaction } from "@/features/integrations";
+import { NotificationReaderPanel } from "@/features/integrations";
 import type { StorageMode } from "@/entities/finance";
 import { displayDate, Icon } from "./finance-page-shared";
 
@@ -6,11 +14,22 @@ export function SettingsPage({
   mode,
   providers,
   salaryPeriods,
+  accounts,
+  monitoredCards,
+  notificationReader,
+  detectedTransactions,
+  recentReaderTransactions,
   onMode,
   onClear,
   onSalary,
   onEditSalary,
   onDeleteSalary,
+  onReaderSettings,
+  onAddMonitoredCard,
+  onEditMonitoredCard,
+  onDeleteMonitoredCard,
+  onReviewDetectedTransaction,
+  onDismissDetectedTransaction,
 }: {
   mode: StorageMode;
   providers: Array<{
@@ -24,14 +43,38 @@ export function SettingsPage({
     };
   }>;
   salaryPeriods: SalaryPeriod[];
+  accounts: AccountRecord[];
+  monitoredCards: MonitoredCardRecord[];
+  notificationReader: NotificationReaderSettings;
+  detectedTransactions: DetectedTransaction[];
+  recentReaderTransactions: ExpenseRecord[];
   onMode: (mode: StorageMode) => void;
   onClear: () => void;
   onSalary: () => void;
   onEditSalary: (period: SalaryPeriod) => void;
   onDeleteSalary: (period: SalaryPeriod) => void;
+  onReaderSettings: (settings: NotificationReaderSettings) => void;
+  onAddMonitoredCard: (card: MonitoredCardRecord) => void;
+  onEditMonitoredCard: (card: MonitoredCardRecord) => void;
+  onDeleteMonitoredCard: (card: MonitoredCardRecord) => void;
+  onReviewDetectedTransaction: (candidate: DetectedTransaction) => void;
+  onDismissDetectedTransaction: (candidate: DetectedTransaction) => void;
 }) {
   return (
     <div className="settings-stack">
+      <NotificationReaderPanel
+        settings={notificationReader}
+        cards={monitoredCards}
+        accounts={accounts}
+        recentCandidates={detectedTransactions}
+        recentSavedTransactions={recentReaderTransactions}
+        onSettings={onReaderSettings}
+        onAddCard={onAddMonitoredCard}
+        onEditCard={onEditMonitoredCard}
+        onDeleteCard={onDeleteMonitoredCard}
+        onReviewCandidate={onReviewDetectedTransaction}
+        onDismissCandidate={onDismissDetectedTransaction}
+      />
       <section className="panel settings-panel">
         <div className="settings-title">
           <span className="settings-icon" aria-hidden="true">

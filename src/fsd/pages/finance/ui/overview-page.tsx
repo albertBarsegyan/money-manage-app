@@ -15,6 +15,7 @@ import {
   sourceLabel,
   Icon,
   EmptyState,
+  paydayBalanceHint,
 } from "./finance-page-shared";
 import { TransactionRows } from "./transaction-rows";
 import { DailySpendingCard } from "./daily-spending-card";
@@ -116,13 +117,26 @@ export function Overview({
             </div>
             <div className="stat-card">
               <div className="stat-top">
-                <span>Projected at payday</span>
+                <span>Expected balance at payday</span>
                 <span className="stat-icon lilac" aria-hidden="true">
                   ⌁
                 </span>
               </div>
-              <b>{amountLabel(summary.projectedRemainingMinor, summary.currency)}</b>
-              <small>Based on confirmed period activity</small>
+              <b
+                title={paydayBalanceHint(summary.projectedRemainingMinor)}
+                aria-label={`${
+                  summary.projectedRemainingMinor < 0
+                    ? "Payday shortfall"
+                    : "Expected balance at payday"
+                } ${amountLabel(summary.projectedRemainingMinor, summary.currency)}`}
+              >
+                {amountLabel(summary.projectedRemainingMinor, summary.currency)}
+              </b>
+              <small>
+                {summary.projectedRemainingMinor < 0
+                  ? "Shortfall from confirmed period activity"
+                  : "Confirmed activity only; no future spend assumed"}
+              </small>
             </div>
             <div className="stat-card period-breakdown-card">
               <div className="stat-top">

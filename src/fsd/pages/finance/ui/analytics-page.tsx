@@ -1,5 +1,5 @@
 import { calculateBudget, type FinanceData } from "@/entities/finance";
-import { amountLabel, daysLabel, EmptyState, Fact } from "./finance-page-shared";
+import { amountLabel, daysLabel, EmptyState, Fact, paydayBalanceHint } from "./finance-page-shared";
 
 export function AnalyticsPage({
   data,
@@ -65,8 +65,9 @@ export function AnalyticsPage({
             />
             <Fact label="Refunds" value={amountLabel(summary.refundsMinor, summary.currency)} />
             <Fact
-              label="Projected at payday"
+              label="Remaining period balance"
               value={amountLabel(summary.projectedRemainingMinor, summary.currency)}
+              hint={paydayBalanceHint(summary.projectedRemainingMinor)}
             />
           </div>
         ) : (

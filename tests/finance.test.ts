@@ -116,6 +116,7 @@ test("budget includes only received income and confirmed same-currency activity"
   assert.equal(result.confirmedExpensesMinor, 3_000);
   assert.equal(result.refundsMinor, 500);
   assert.equal(result.remainingMinor, 9_500);
+  assert.equal(result.projectedRemainingMinor, result.remainingMinor);
   assert.equal(result.daysUntilSalary, 15);
   assert.ok(result.availableTodayMinor <= result.remainingMinor);
   assert.equal(result.spentTodayMinor, 0);
@@ -352,16 +353,208 @@ test("budget handles deficit, salary day, and date boundaries", () => {
   const negative = calculateBudget(data, period, "2026-01-30");
   assert.equal(negative.remainingMinor, -500);
   assert.equal(negative.availableTodayMinor, -500);
-  assert.ok(negative.projectedRemainingMinor < 0);
+  assert.equal(negative.projectedRemainingMinor, -500);
   const salaryDay = calculateBudget(data, period, "2026-01-31");
   assert.equal(salaryDay.daysUntilSalary, 0);
   assert.equal(salaryDay.confirmedExpensesMinor, 1_000);
   assert.equal(salaryDay.remainingMinor, -500);
+  assert.equal(salaryDay.projectedRemainingMinor, salaryDay.remainingMinor);
   assert.equal(currentSalaryPeriod({ ...data, salaryPeriods: [period] }, "2026-01-31"), undefined);
   assert.equal(
     currentSalaryPeriod({ ...data, salaryPeriods: [period] }, "2026-01-30")?.id,
     period.id,
   );
+});
+
+test("remaining period balance and payday expectation use confirmed activity only", () => {
+  // 1. Income AMD 400,000.00 and expenses AMD 271,800.00 → remaining AMD 128,200.00
+  const data = emptyFinanceData();
+  data.salaryPeriods.push(period);
+  data.income.push({ ...receivedIncome, amountMinor: 40_000_000 });
+  data.expenses.push(
+    tx({
+      id: "rent",
+      amountMinor: 20_000_000,
+      occurredAt: "2026-01-02T10:00",
+      budgetMode: "GLOBAL",
+    }),
+    tx({ id: "food", amountMinor: 7_180_000, occurredAt: "2026-01-04T12:00", budgetMode: "DAILY" }),
+  );
+  const midPeriod = calculateBudget(data, period, "2026-01-05");
+  assert.equal(midPeriod.confirmedIncomeMinor, 40_000_000);
+  assert.equal(midPeriod.confirmedExpensesMinor, 27_180_000);
+  assert.equal(midPeriod.remainingMinor, 12_820_000);
+  assert.equal(midPeriod.projectedRemainingMinor, 12_820_000);
+  // Regression: the previous formula extrapolated average daily outflow across
+  // remaining days and invented a large negative balance.
+  const elapsedDays = dayDifference(period.startsOn, "2026-01-05");
+  const daysUntil = dayDifference("2026-01-05", period.nextSalaryOn);
+  const previousBrokenProjection =
+    midPeriod.remainingMinor -
+    Math.trunc(midPeriod.confirmedExpensesMinor / elapsedDays) * daysUntil;
+  assert.ok(previousBrokenProjection < 0);
+  assert.notEqual(midPeriod.projectedRemainingMinor, previousBrokenProjection);
+
+  // 2. No expenses and positive confirmed income
+  const incomeOnly = emptyFinanceData();
+  incomeOnly.income.push({ ...receivedIncome, amountMinor: 40_000_000 });
+  const noExpenses = calculateBudget(incomeOnly, period, "2026-01-10");
+  assert.equal(noExpenses.remainingMinor, 40_000_000);
+  assert.equal(noExpenses.projectedRemainingMinor, 40_000_000);
+
+  // 3. Expenses greater than income (negative balance / shortfall)
+  const overspent = emptyFinanceData();
+  overspent.income.push({ ...receivedIncome, amountMinor: 10_000_000 });
+  overspent.expenses.push(
+    tx({
+      id: "big",
+      amountMinor: 15_000_000,
+      occurredAt: "2026-01-03T09:00",
+      budgetMode: "GLOBAL",
+    }),
+  );
+  const deficit = calculateBudget(overspent, period, "2026-01-10");
+  assert.equal(deficit.remainingMinor, -5_000_000);
+  assert.equal(deficit.projectedRemainingMinor, -5_000_000);
+
+  // 4. Refunds correctly increase the available balance
+  overspent.expenses.push(
+    tx({ id: "refund", amountMinor: 2_000_000, occurredAt: "2026-01-04T09:00", type: "REFUND" }),
+  );
+  const withRefund = calculateBudget(overspent, period, "2026-01-10");
+  assert.equal(withRefund.refundsMinor, 2_000_000);
+  assert.equal(withRefund.remainingMinor, -3_000_000);
+  assert.equal(withRefund.projectedRemainingMinor, -3_000_000);
+
+  // 5. No confirmed transactions
+  const empty = calculateBudget(emptyFinanceData(), period, "2026-01-10");
+  assert.equal(empty.confirmedIncomeMinor, 0);
+  assert.equal(empty.confirmedExpensesMinor, 0);
+  assert.equal(empty.refundsMinor, 0);
+  assert.equal(empty.remainingMinor, 0);
+  assert.equal(empty.projectedRemainingMinor, 0);
+
+  // 6. Future-dated transactions are excluded until their date
+  const withFuture = emptyFinanceData();
+  withFuture.income.push({ ...receivedIncome, amountMinor: 20_000_000 });
+  withFuture.expenses.push(
+    tx({
+      id: "future",
+      amountMinor: 5_000_000,
+      occurredAt: "2026-01-20T12:00",
+      budgetMode: "GLOBAL",
+    }),
+  );
+  const beforeFuture = calculateBudget(withFuture, period, "2026-01-10");
+  assert.equal(beforeFuture.confirmedExpensesMinor, 0);
+  assert.equal(beforeFuture.remainingMinor, 20_000_000);
+  assert.equal(beforeFuture.projectedRemainingMinor, 20_000_000);
+  const onFutureDay = calculateBudget(withFuture, period, "2026-01-20");
+  assert.equal(onFutureDay.confirmedExpensesMinor, 5_000_000);
+  assert.equal(onFutureDay.remainingMinor, 15_000_000);
+
+  // 7. Transactions on period start and exclusive end dates
+  const boundary = emptyFinanceData();
+  boundary.income.push({ ...receivedIncome, amountMinor: 10_000_000, receivedOn: "2026-01-01" });
+  boundary.expenses.push(
+    tx({
+      id: "start",
+      amountMinor: 1_000_000,
+      occurredAt: "2026-01-01T08:00",
+      budgetMode: "GLOBAL",
+    }),
+    tx({
+      id: "on-payday",
+      amountMinor: 2_000_000,
+      occurredAt: "2026-01-31T08:00",
+      budgetMode: "GLOBAL",
+    }),
+  );
+  const nearEnd = calculateBudget(boundary, period, "2026-01-30");
+  assert.equal(nearEnd.confirmedExpensesMinor, 1_000_000);
+  assert.equal(nearEnd.remainingMinor, 9_000_000);
+  assert.equal(nearEnd.projectedRemainingMinor, 9_000_000);
+  // Payday is the exclusive end: still visible historically but not an active period day.
+  const onPayday = calculateBudget(boundary, period, "2026-01-31");
+  assert.equal(onPayday.confirmedExpensesMinor, 1_000_000);
+  assert.equal(onPayday.daysUntilSalary, 0);
+  assert.equal(onPayday.projectedRemainingMinor, onPayday.remainingMinor);
+
+  // 8. Payday today
+  assert.equal(onPayday.daysUntilSalary, 0);
+  assert.equal(onPayday.dailyAllowanceMinor, 0);
+
+  // 9. Payday in the next calendar month
+  const crossMonth: SalaryPeriod = {
+    ...period,
+    id: "cross-month",
+    startsOn: "2026-01-20",
+    nextSalaryOn: "2026-02-15",
+  };
+  const cross = emptyFinanceData();
+  cross.income.push({
+    ...receivedIncome,
+    amountMinor: 8_000_000,
+    receivedOn: "2026-01-20",
+    salaryPeriodId: crossMonth.id,
+  });
+  cross.expenses.push(
+    tx({
+      id: "jan",
+      amountMinor: 3_000_000,
+      occurredAt: "2026-01-25T12:00",
+      budgetMode: "GLOBAL",
+      salaryPeriodId: crossMonth.id,
+    }),
+  );
+  const crossResult = calculateBudget(cross, crossMonth, "2026-01-28");
+  assert.equal(crossResult.daysUntilSalary, dayDifference("2026-01-28", "2026-02-15"));
+  assert.equal(crossResult.remainingMinor, 5_000_000);
+  assert.equal(crossResult.projectedRemainingMinor, 5_000_000);
+
+  // 10. Multiple income and expense records without double counting
+  const multi = emptyFinanceData();
+  multi.income.push(
+    { ...receivedIncome, id: "salary", amountMinor: 30_000_000 },
+    {
+      ...receivedIncome,
+      id: "bonus",
+      source: "BONUS",
+      amountMinor: 5_000_000,
+      receivedOn: "2026-01-05",
+    },
+  );
+  multi.expenses.push(
+    tx({ id: "a", amountMinor: 4_000_000, occurredAt: "2026-01-03T10:00", budgetMode: "GLOBAL" }),
+    tx({ id: "b", amountMinor: 1_500_000, occurredAt: "2026-01-06T10:00", budgetMode: "DAILY" }),
+    tx({ id: "income-tx", amountMinor: 2_000_000, occurredAt: "2026-01-07T10:00", type: "INCOME" }),
+  );
+  const multiResult = calculateBudget(multi, period, "2026-01-10");
+  assert.equal(multiResult.confirmedIncomeMinor, 37_000_000);
+  assert.equal(multiResult.confirmedExpensesMinor, 5_500_000);
+  assert.equal(multiResult.remainingMinor, 31_500_000);
+  assert.equal(multiResult.projectedRemainingMinor, 31_500_000);
+
+  // 11. Missing or undefined starting/expected salary must not invent a budget
+  const noSalaryBudget: SalaryPeriod = {
+    ...period,
+    id: "no-expected",
+    expectedSalaryMinor: undefined,
+  };
+  const missing = emptyFinanceData();
+  missing.expenses.push(
+    tx({
+      id: "only-expense",
+      amountMinor: 1_000_000,
+      occurredAt: "2026-01-05T10:00",
+      budgetMode: "GLOBAL",
+    }),
+  );
+  const missingBudget = calculateBudget(missing, noSalaryBudget, "2026-01-10");
+  assert.equal(missingBudget.confirmedIncomeMinor, 0);
+  assert.equal(missingBudget.remainingMinor, -1_000_000);
+  assert.equal(missingBudget.projectedRemainingMinor, -1_000_000);
+  assert.equal(calculateAccountBalance(missing, "missing-account"), undefined);
 });
 
 test("daily allowance is zero before a period and on or after its exclusive end date", () => {

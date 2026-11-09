@@ -6,12 +6,17 @@ export interface BudgetSummary {
   confirmedIncomeMinor: number;
   confirmedExpensesMinor: number;
   refundsMinor: number;
+  /** Confirmed period income + refunds − confirmed period expenses. */
   remainingMinor: number;
   daysUntilSalary: number;
   dailyAllowanceMinor: number;
   availableTodayMinor: number;
   spentTodayMinor: number;
   periodProgress: number;
+  /**
+   * Expected balance at the next payday from confirmed activity only.
+   * Equals remainingMinor while the app has no future-transaction forecast.
+   */
   projectedRemainingMinor: number;
   categoryTotals: Array<{ category: string; amountMinor: number }>;
   activityByDay: Array<{ date: string; amountMinor: number }>;
@@ -93,12 +98,11 @@ export function calculateBudget(
     isActivePeriodDay ? daysUntilSalary : 0,
     spentTodayMinor,
   );
-  const elapsedOutflow = addMinorUnits(expenseMinor, -refundMinor);
-  const dailyOutflow = elapsedDays > 0 ? Math.trunc(elapsedOutflow / elapsedDays) : 0;
-  const projectedRemainingMinor = addMinorUnits(
-    remainingMinor,
-    -multiplyMinorUnits(dailyOutflow, daysUntilSalary),
-  );
+  // The app has no reliable forecast model for future spend or expected income
+  // (EXPECTED income is tracked separately and excluded until RECEIVED). Do not
+  // invent future transactions by extrapolating historical average outflow.
+  // Expected balance at payday is therefore the confirmed period remainder.
+  const projectedRemainingMinor = remainingMinor;
 
   return {
     currency: period.currency,
@@ -218,13 +222,6 @@ function expenseApplies(item: ExpenseRecord, period: SalaryPeriod, today: string
     date < period.nextSalaryOn &&
     date <= today
   );
-}
-
-function multiplyMinorUnits(amount: number, multiplier: number) {
-  const result = amount * multiplier;
-  if (!Number.isSafeInteger(result))
-    throw new RangeError("Money projection exceeds the safe integer range.");
-  return result;
 }
 
 /** Date-only UTC arithmetic avoids daylight-saving and timezone-boundary errors. */

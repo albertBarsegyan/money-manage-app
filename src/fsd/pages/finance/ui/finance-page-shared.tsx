@@ -90,13 +90,20 @@ export function EmptyState({
     </div>
   );
 }
-export function Fact({ label, value }: { label: string; value: string }) {
+export function Fact({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="fact-row">
+    <div className="fact-row" title={hint}>
       <span>{label}</span>
       <b>{value}</b>
     </div>
   );
+}
+
+/** Payday metric is confirmed period remainder until a forecast model exists. */
+export function paydayBalanceHint(remainingMinor: number) {
+  return remainingMinor < 0
+    ? "Shortfall from confirmed income + refunds − confirmed expenses. No future spending is assumed."
+    : "Confirmed income + refunds − confirmed expenses. No future spending is assumed before payday.";
 }
 export function accountName(accounts: AccountRecord[], id?: string) {
   if (!id) return "No account";

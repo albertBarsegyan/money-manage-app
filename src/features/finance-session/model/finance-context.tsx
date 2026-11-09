@@ -89,6 +89,9 @@ class FinanceSession {
   clearAllData() {
     this.manager.activeProvider.clearAllData();
   }
+  replaceAllData(data: FinanceData) {
+    this.manager.activeProvider.replaceAllData(data);
+  }
   selectStorageMode(mode: StorageMode, confirmed = false) {
     this.manager.select(mode, confirmed);
   }
@@ -202,9 +205,7 @@ function StorageStatus({
         <div className="storage-gate-brand">FINORA</div>
         <h1>{title}</h1>
         <p>{detail}</p>
-        {loading && (
-          <span className="storage-gate-footnote">Your data stays on this device</span>
-        )}
+        {loading && <span className="storage-gate-footnote">Your data stays on this device</span>}
       </section>
     </main>
   );

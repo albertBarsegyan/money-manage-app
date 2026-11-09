@@ -11,7 +11,14 @@ import {
 } from "../src/entities/finance/calculations/budget";
 import { formatMoney, parseMoney } from "../src/entities/finance/calculations/money";
 import { previewCsvImport } from "../src/entities/finance/csv-import";
-import { createExportEnvelope, previewImport } from "../src/entities/finance/export-format";
+import {
+  countFinanceRecords,
+  createExportEnvelope,
+  parseExportText,
+  previewImport,
+  previewReplaceImport,
+  serializeExport,
+} from "../src/entities/finance/export-format";
 import {
   NotificationCandidateInbox,
   type AndroidNotificationParser,
@@ -537,6 +544,51 @@ test("versioned export previews validate records and report duplicates without c
     previewImport({ format: "other", version: 99 }, emptyFinanceData()).errors[0],
     /malformed/,
   );
+});
+
+test("compact JSON export round-trips through replace import and updates the active provider", () => {
+  const source = emptyFinanceData();
+  source.salaryPeriods.push(period);
+  source.income.push(receivedIncome);
+  source.accounts.push({
+    id: "cash",
+    name: "Cash",
+    type: "CASH",
+    currency: "AMD",
+    openingBalanceMinor: 500,
+  });
+  source.expenses.push(
+    tx({
+      id: "expense-1",
+      accountId: "cash",
+      salaryPeriodId: period.id,
+      amountMinor: 250,
+    }),
+  );
+  source.notificationReader = { enabled: true, selectedPackages: ["bank.app"] };
+  const compact = serializeExport(source, "2026-01-20T10:00:00.000Z");
+  assert.equal(compact.includes("\n"), false);
+  assert.equal(JSON.parse(compact).format, "finora-export");
+  const preview = parseExportText(compact);
+  assert.deepEqual(preview.errors, []);
+  assert.equal(countFinanceRecords(preview.records).total, 4);
+  const provider = new MemoryStorageProvider();
+  provider.addAccount({
+    id: "old",
+    name: "Old",
+    type: "OTHER",
+    currency: "USD",
+    openingBalanceMinor: 1,
+  });
+  assert.equal(provider.capabilities.importExport, true);
+  provider.replaceAllData(preview.records);
+  assert.deepEqual(provider.getSnapshot().income, source.income);
+  assert.deepEqual(provider.getSnapshot().expenses, source.expenses);
+  assert.deepEqual(provider.getSnapshot().accounts, source.accounts);
+  assert.deepEqual(provider.getSnapshot().salaryPeriods, source.salaryPeriods);
+  assert.deepEqual(provider.getSnapshot().notificationReader, source.notificationReader);
+  assert.match(parseExportText("{not-json").errors[0], /valid JSON/);
+  assert.match(previewReplaceImport({ format: "other", version: 1 }).errors[0], /malformed/);
 });
 
 test("Android candidate inbox only accepts allowlisted packages and never stores raw payload text", () => {

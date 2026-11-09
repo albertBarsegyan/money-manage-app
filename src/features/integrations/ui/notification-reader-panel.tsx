@@ -98,6 +98,15 @@ export function NotificationReaderPanel({
   const updateSettings = (patch: Partial<NotificationReaderSettings>) => {
     onSettings({ ...settings, ...patch });
   };
+  const refreshStatus = async () => {
+    const [readerStatus, installed] = await Promise.all([
+      notificationReader.getStatus(),
+      notificationReader.getInstalledApps().catch(() => ({ apps: [] })),
+    ]);
+    setStatus(readerStatus);
+    setApps(installed.apps);
+    return readerStatus;
+  };
   const requestAccess = async () => {
     setError("");
     try {
@@ -109,12 +118,29 @@ export function NotificationReaderPanel({
     }
   };
   const requestAlerts = async () => {
+    setError("");
     try {
       const result = await notificationReader.requestNotificationPermission();
       setStatus((current) => ({ ...current, notificationsAllowed: result.granted }));
+      return result.granted;
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : "Could not request notification permission.",
+      );
+      return false;
+    }
+  };
+  const enableBackgroundReading = async () => {
+    setError("");
+    try {
+      await requestAlerts();
+      const next = await refreshStatus();
+      if (!next.accessGranted) await requestAccess();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Could not request background notification permissions.",
       );
     }
   };
@@ -133,7 +159,10 @@ export function NotificationReaderPanel({
         </span>
         <div>
           <h2>Notification Reader</h2>
-          <p>Review transaction alerts locally before they enter your records.</p>
+          <p>
+            Listen in the background for Wallet and bank alerts, then approve them as daily or
+            global expenses.
+          </p>
         </div>
         <label className="reader-enable">
           <input
@@ -141,8 +170,9 @@ export function NotificationReaderPanel({
             checked={settings.enabled}
             disabled={!nativeAvailable}
             onChange={(event) => {
-              updateSettings({ enabled: event.currentTarget.checked });
-              if (event.currentTarget.checked && !status.accessGranted) void requestAccess();
+              const enabled = event.currentTarget.checked;
+              updateSettings({ enabled });
+              if (enabled) void enableBackgroundReading();
             }}
           />
           <span>{settings.enabled ? "Enabled" : "Disabled"}</span>
@@ -160,8 +190,8 @@ export function NotificationReaderPanel({
             <div>
               <b>Notification access: {status.accessGranted ? "Allowed" : "Not allowed"}</b>
               <p>
-                Android manages this sensitive access. Finora processes selected app notifications
-                on this device.
+                Required so Finora can read selected app alerts while the app is open, in Recents,
+                or running in the background. Parsing stays on this device.
               </p>
             </div>
             {!status.accessGranted && (
@@ -170,14 +200,22 @@ export function NotificationReaderPanel({
               </button>
             )}
           </div>
-          {settings.enabled && !status.notificationsAllowed && (
-            <div className="reader-alert-permission">
-              <span>Background review alerts need Android notification permission.</span>
+          <div
+            className={`reader-alert-permission ${status.notificationsAllowed ? "granted" : ""}`}
+          >
+            <div>
+              <b>Review alerts: {status.notificationsAllowed ? "Allowed" : "Not allowed"}</b>
+              <p>
+                Needed to show an actionable panel when a matching card payment is detected while
+                Finora is hidden. Use Add daily, Add global, or Dismiss without opening the app.
+              </p>
+            </div>
+            {!status.notificationsAllowed && (
               <button className="secondary-button" onClick={() => void requestAlerts()}>
                 Allow alerts
               </button>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="reader-section">
             <div className="reader-section-heading">
@@ -212,7 +250,10 @@ export function NotificationReaderPanel({
             <div className="reader-section-heading">
               <div>
                 <h3>Monitored cards and accounts</h3>
-                <p>Only card name, bank, currency, and optional last four digits are stored.</p>
+                <p>
+                  Finora only keeps alerts that match an enabled card by last four digits. Name,
+                  bank, currency, and last four are stored — never a full card number.
+                </p>
               </div>
               <button
                 className="primary-button"
@@ -237,6 +278,7 @@ export function NotificationReaderPanel({
                     <span>
                       {card.bankName || "Bank not specified"} ·{" "}
                       {cardTypes.find((type) => type.value === card.type)?.label} · {card.currency}
+                      {!card.lastFour && card.monitoringEnabled ? " · needs last four" : ""}
                     </span>
                     {card.accountId && (
                       <small>
@@ -249,9 +291,16 @@ export function NotificationReaderPanel({
                     <input
                       type="checkbox"
                       checked={card.monitoringEnabled}
-                      onChange={() =>
-                        onEditCard({ ...card, monitoringEnabled: !card.monitoringEnabled })
-                      }
+                      onChange={() => {
+                        if (!card.monitoringEnabled && !card.lastFour) {
+                          setError("Add the last four digits before enabling monitoring.");
+                          setEditingCard(card);
+                          setCardDialog(true);
+                          return;
+                        }
+                        setError("");
+                        onEditCard({ ...card, monitoringEnabled: !card.monitoringEnabled });
+                      }}
                     />
                     <span>Monitor</span>
                   </label>
@@ -271,7 +320,8 @@ export function NotificationReaderPanel({
               ))
             ) : (
               <p className="reader-empty">
-                Add a card to match alerts to an account. Monitoring can be enabled per card.
+                Add each card you want Finora to watch, including its last four digits. Alerts from
+                other cards are ignored.
               </p>
             )}
           </div>
@@ -331,12 +381,13 @@ export function NotificationReaderPanel({
           </div>
 
           <div className="reader-callout">
-            <b>Permission and privacy</b>
+            <b>Background reading and privacy</b>
             <p>
-              Enable access in Android settings, then choose apps above. Android may stop the
-              listener if access is revoked. Notification text is parsed on-device and is not sent
-              to a server. Finora does not ask for full card numbers, security codes, PINs, or
-              banking credentials.
+              Keep Finora in Recents (do not force-stop it). With notification access and alert
+              permission granted, matching Wallet or bank alerts are reviewed even when the app is
+              hidden. Approve as daily or global from the review notification, or open Finora to
+              edit first. Only last-four matches from your monitored cards are kept. Parsing stays
+              on-device. Finora never asks for full card numbers, CVV, PINs, or bank logins.
             </p>
           </div>
         </>
@@ -386,6 +437,10 @@ function MonitoredCardDialog({
     event.preventDefault();
     if (!name.trim()) {
       setError("Enter a card or account name.");
+      return;
+    }
+    if (monitoringEnabled && !/^\d{4}$/.test(lastFour)) {
+      setError("Enter the last four digits to match notifications for this card.");
       return;
     }
     if (lastFour && !/^\d{4}$/.test(lastFour)) {
@@ -446,7 +501,13 @@ function MonitoredCardDialog({
             }}
           />
         </div>
-        <FormField label="Last four digits (optional)">
+        <FormField
+          label={
+            monitoringEnabled
+              ? "Last four digits (required to monitor)"
+              : "Last four digits (optional)"
+          }
+        >
           <Input
             inputMode="numeric"
             autoComplete="off"

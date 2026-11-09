@@ -5,6 +5,7 @@ internal data class MonitoredCardMatch(
     val lastFour: String?,
     val currency: String,
     val monitoringEnabled: Boolean,
+    val accountId: String? = null,
 )
 
 internal object NotificationCardMatcher {
@@ -23,4 +24,23 @@ internal object NotificationCardMatcher {
             .distinct()
             .singleOrNull()
     }
+
+    /**
+     * Only notifications that uniquely match an enabled monitored card (by last four)
+     * are eligible. Currency comes from the notification when present, otherwise the card.
+     */
+    fun resolveAccepted(
+        lastFour: String?,
+        parsedCurrency: String?,
+        cards: List<MonitoredCardMatch>,
+    ): AcceptedCardMatch? {
+        val cardId = matchCardId(lastFour, cards) ?: return null
+        val currency = parsedCurrency ?: matchCurrency(lastFour, cards) ?: return null
+        return AcceptedCardMatch(cardId = cardId, currency = currency)
+    }
 }
+
+internal data class AcceptedCardMatch(
+    val cardId: String,
+    val currency: String,
+)

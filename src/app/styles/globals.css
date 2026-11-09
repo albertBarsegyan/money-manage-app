@@ -1476,9 +1476,9 @@ textarea:focus-visible,
 .reader-enable { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 650; color: #5a5f6d; }
 .reader-enable input, .reader-app-row input, .reader-card-monitor input, .reader-dialog-check input { accent-color: #6d5ee9; width: 16px; height: 16px; }
 .reader-access, .reader-alert-permission { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid #f0e1bf; border-radius: 8px; background: #fffaf0; padding: 12px 13px; }
-.reader-access.granted { border-color: #dcefe5; background: #f3faf6; }
-.reader-access b, .reader-section-heading h3, .reader-callout b { font-size: 10px; margin: 0; }
-.reader-access p, .reader-section-heading p, .reader-callout p { font-size: 9px; color: #777f83; line-height: 1.55; margin: 5px 0 0; }
+.reader-access.granted, .reader-alert-permission.granted { border-color: #dcefe5; background: #f3faf6; }
+.reader-access b, .reader-alert-permission b, .reader-section-heading h3, .reader-callout b { font-size: 10px; margin: 0; }
+.reader-access p, .reader-alert-permission p, .reader-section-heading p, .reader-callout p { font-size: 9px; color: #777f83; line-height: 1.55; margin: 5px 0 0; }
 .reader-section { border-top: 1px solid #eff0f3; padding-top: 15px; }
 .reader-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .reader-section-heading > span { font-size: 8px; color: #858b99; white-space: nowrap; }
@@ -1499,7 +1499,7 @@ textarea:focus-visible,
 .reader-candidate-row .primary-button { height: 30px; padding-inline: 10px; font-size: 9px; }
 .reader-empty { font-size: 9px; color: #9398a5; line-height: 1.55; margin: 4px 0 0; }
 .reader-callout { border: 1px solid #e8e6f4; border-radius: 8px; background: #faf9ff; padding: 11px 12px; }
-.reader-alert-permission { border-color: #e8e6f4; background: #faf9ff; font-size: 9px; color: #68657e; }
+.reader-alert-permission:not(.granted) { border-color: #f0e1bf; background: #fffaf0; }
 .reader-error { color: #b34f49; font-size: 9px; margin: 0; }
 .reader-detected-summary { display: flex; flex-direction: column; gap: 5px; border: 1px solid #e7e5f2; background: #faf9ff; border-radius: 7px; padding: 10px 12px; }
 .reader-detected-summary span { color: #898d9a; font-size: 8px; overflow-wrap: anywhere; }
@@ -1508,8 +1508,8 @@ textarea:focus-visible,
 .reader-confirm-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .reader-confirm-actions > div { padding-top: 0; }
 .dark .reader-access, .dark .reader-alert-permission, .dark .reader-app-row, .dark .reader-callout, .dark .reader-detected-summary, .dark .reader-review-note { background: #242333; border-color: #3b394e; }
-.dark .reader-access.granted { background: #1c2a25; border-color: #2e4b3d; }
-.dark .reader-app-row b, .dark .reader-card-copy b, .dark .reader-candidate-row b, .dark .reader-access b, .dark .reader-section-heading h3, .dark .reader-callout b { color: #efeff6; }
+.dark .reader-access.granted, .dark .reader-alert-permission.granted { background: #1c2a25; border-color: #2e4b3d; }
+.dark .reader-app-row b, .dark .reader-card-copy b, .dark .reader-candidate-row b, .dark .reader-access b, .dark .reader-alert-permission b, .dark .reader-section-heading h3, .dark .reader-callout b { color: #efeff6; }
 .dark .reader-card-row, .dark .reader-candidate-row { border-color: #343342; }
 .dark .reader-card-row > button, .dark .reader-candidate-row > button:not(.primary-button) { background: #242333; border-color: #3b394e; color: #dbd9e7; }
 @media (max-width: 760px) {
@@ -1520,4 +1520,37 @@ textarea:focus-visible,
   .reader-candidate-row > div { min-width: calc(100% - 8px); }
   .reader-card-row > button, .reader-candidate-row > button { min-height: 34px; }
   .reader-access, .reader-alert-permission { align-items: flex-start; flex-direction: column; }
+}
+
+.portability-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.portability-actions .secondary-button,
+.portability-actions .import-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.portability-actions .import-button.is-disabled,
+.portability-actions .secondary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+@media (max-width: 760px) {
+  .portability-actions .secondary-button,
+  .portability-actions .import-button {
+    min-height: 44px;
+    flex: 1 1 140px;
+  }
 }

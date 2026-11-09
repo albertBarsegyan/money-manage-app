@@ -8,8 +8,11 @@ import { App } from "@capacitor/app";
 import { AnimatePresence, motion } from "motion/react";
 import {
   calculateBudget,
+  countFinanceRecords,
   currentSalaryPeriod,
+  parseExportText,
   previewCsvImport,
+  serializeExport,
   type AccountRecord,
   type ExpenseRecord,
   type ExpenseBudgetMode,
@@ -39,12 +42,11 @@ import { SalaryPeriodsPage } from "./salary-periods-page";
 import {
   notificationReader,
   ReaderTransactionDialog,
+  toExpenseRecord,
   type DetectedTransaction,
 } from "@/features/integrations";
 import Image from "next/image";
-import icon from '@/shared/assets/icon.svg';
-import financeIcon from "@/shared/assets/icon.svg";
-
+import icon from "@/shared/assets/icon.svg";
 
 type Dialog = "income" | "expense" | "account" | "salary" | "reader" | null;
 const viewPaths = {
@@ -120,16 +122,79 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
   const [detectedTransactions, setDetectedTransactions] = useState<DetectedTransaction[]>([]);
   const [reviewCandidate, setReviewCandidate] = useState<DetectedTransaction>();
   const autoPromptedCandidates = useRef(new Set<string>());
+  const sessionRef = useRef(session);
+  const expensesRef = useRef(data.expenses);
+  const reviewCandidateRef = useRef(reviewCandidate);
   const query = routeSearch.get("q") ?? "";
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const today = useSyncExternalStore(subscribeToDate, localDate, serverDate);
   useEffect(() => {
+    sessionRef.current = session;
+    expensesRef.current = data.expenses;
+    reviewCandidateRef.current = reviewCandidate;
+  }, [session, data.expenses, reviewCandidate]);
+  useEffect(() => {
     if (!notificationReader.isAvailable()) return;
     let active = true;
     let transactionListener: { remove: () => Promise<void> } | undefined;
+    let approvedListener: { remove: () => Promise<void> } | undefined;
+    let dismissedListener: { remove: () => Promise<void> } | undefined;
     let appStateListener: { remove: () => Promise<void> } | undefined;
+    const notify = (message: string) => {
+      setError("");
+      setNotice(message);
+      window.setTimeout(() => setNotice(""), 3000);
+    };
+    const fail = (value: unknown) => {
+      setNotice("");
+      setError(value instanceof Error ? value.message : "The change could not be saved.");
+    };
+    const importApproved = (record: ExpenseRecord, message: string) => {
+      const externalReference = record.externalReference;
+      if (!externalReference) return false;
+      if (expensesRef.current.some((item) => item.externalReference === externalReference)) {
+        return false;
+      }
+      sessionRef.current.addExpense(record);
+      setDetectedTransactions((current) =>
+        current.filter((candidate) => candidate.id !== externalReference),
+      );
+      autoPromptedCandidates.current.add(externalReference);
+      if (reviewCandidateRef.current?.id === externalReference) {
+        setReviewCandidate(undefined);
+        setDialog(null);
+      }
+      notify(message);
+      return true;
+    };
+    const applyApprovedExpenses = async () => {
+      const result = await notificationReader.consumeApprovedExpenses();
+      if (!active) return;
+      let imported = 0;
+      for (const expense of result.expenses) {
+        const record = toExpenseRecord(expense);
+        if (!record) continue;
+        try {
+          if (
+            importApproved(
+              record,
+              record.budgetMode === "DAILY"
+                ? "Added as daily expense from notification"
+                : record.type === "INCOME"
+                  ? "Added income from notification"
+                  : "Added as global expense from notification",
+            )
+          )
+            imported += 1;
+        } catch (reason) {
+          console.error("Could not import notification-approved expense.", reason);
+        }
+      }
+      if (imported > 1) notify(`Added ${imported} approved transactions from notifications`);
+    };
     const refreshPending = async () => {
+      await applyApprovedExpenses();
       const result = await notificationReader
         .getPendingCandidates()
         .catch(() => ({ candidates: [] }));
@@ -156,6 +221,47 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
       .catch((reason: unknown) => {
         console.error("Could not subscribe to transaction reader events.", reason);
       });
+    void notificationReader
+      .addApprovedListener((expense) => {
+        if (!active) return;
+        const record = toExpenseRecord(expense);
+        if (!record) return;
+        try {
+          importApproved(
+            record,
+            record.budgetMode === "DAILY"
+              ? "Added as daily expense from notification"
+              : record.type === "INCOME"
+                ? "Added income from notification"
+                : "Added as global expense from notification",
+          );
+        } catch (reason) {
+          fail(reason);
+        }
+      })
+      .then((handle) => {
+        if (active) approvedListener = handle;
+        else void handle.remove();
+      })
+      .catch((reason: unknown) => {
+        console.error("Could not subscribe to notification approvals.", reason);
+      });
+    void notificationReader
+      .addDismissedListener(({ id }) => {
+        if (!active) return;
+        setDetectedTransactions((current) => current.filter((candidate) => candidate.id !== id));
+        if (reviewCandidateRef.current?.id === id) {
+          setReviewCandidate(undefined);
+          setDialog(null);
+        }
+      })
+      .then((handle) => {
+        if (active) dismissedListener = handle;
+        else void handle.remove();
+      })
+      .catch((reason: unknown) => {
+        console.error("Could not subscribe to notification dismissals.", reason);
+      });
     void App.addListener("appStateChange", ({ isActive }) => {
       if (isActive) void refreshPending();
     }).then((handle) => {
@@ -165,6 +271,8 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
     return () => {
       active = false;
       void transactionListener?.remove();
+      void approvedListener?.remove();
+      void dismissedListener?.remove();
       void appStateListener?.remove();
     };
   }, []);
@@ -355,6 +463,75 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
       showError(reason);
     }
   };
+  const exportJson = () => {
+    try {
+      const exportedAt = new Date().toISOString();
+      const payload = serializeExport(data, exportedAt);
+      const stamp = exportedAt.slice(0, 10);
+      const blob = new Blob([payload], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `finora-export-${stamp}.json`;
+      anchor.rel = "noopener";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      const counts = countFinanceRecords(data);
+      flash(
+        counts.total
+          ? `Exported ${counts.total} record${counts.total === 1 ? "" : "s"} to JSON`
+          : "Exported empty Finora snapshot to JSON",
+      );
+    } catch (reason) {
+      showError(reason);
+    }
+  };
+  const importJson = async (file?: File) => {
+    if (!file) return;
+    try {
+      const preview = parseExportText(await file.text());
+      if (preview.errors.length) {
+        showError(
+          new Error(
+            preview.errors.length === 1
+              ? preview.errors[0]
+              : `Import rejected: ${preview.errors[0]} (+${preview.errors.length - 1} more)`,
+          ),
+        );
+        return;
+      }
+      const incoming = countFinanceRecords(preview.records);
+      const existing = countFinanceRecords(data);
+      if (
+        existing.total > 0 &&
+        !window.confirm(
+          `Replace all local Finora data with this file?\n\nCurrent: ${existing.total} records\nImport: ${incoming.total} records (${incoming.income} income, ${incoming.expenses} transactions, ${incoming.accounts} accounts, ${incoming.salaryPeriods} salary periods, ${incoming.monitoredCards} cards)\n\nThis cannot be undone.`,
+        )
+      )
+        return;
+      session.replaceAllData(preview.records);
+      if (notificationReader.isAvailable())
+        void notificationReader.clearPendingCandidates().catch((reason: unknown) => {
+          console.error("Could not clear pending transaction notifications.", reason);
+        });
+      setDetectedTransactions([]);
+      setReviewCandidate(undefined);
+      setDialog(null);
+      setEditingIncome(undefined);
+      setEditingExpense(undefined);
+      setEditingAccount(undefined);
+      setEditingSalary(undefined);
+      flash(
+        incoming.total
+          ? `Imported ${incoming.total} record${incoming.total === 1 ? "" : "s"} from JSON`
+          : "Imported empty Finora snapshot from JSON",
+      );
+    } catch (reason) {
+      showError(reason);
+    }
+  };
 
   const nav: Array<[View, string, (typeof viewPaths)[View]]> = [
     ["Overview", "grid", viewPaths.Overview],
@@ -385,9 +562,9 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
         />
       )}
       <aside className={`sidebar${mobileNavOpen ? " mobile-open" : ""}`}>
-        <Link href='/' className="brand gap-2">
+        <Link href="/" className="brand gap-2">
           <Image src={icon} alt="" width={30} height={30} />
-          <span className='text-white hidden lg:block'>Finora</span>
+          <span className="text-white hidden lg:block">Finora</span>
         </Link>
         <div className="workspace-label">FINANCIAL SPACE</div>
         <nav id="main-navigation" className="nav-list" aria-label="Main navigation">
@@ -654,6 +831,8 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
                     .slice(0, 5)}
                   onMode={handleStorageMode}
                   onClear={clearSession}
+                  onExport={exportJson}
+                  onImport={(file) => void importJson(file)}
                   onSalary={() => openSalary()}
                   onEditSalary={openSalary}
                   onDeleteSalary={(item) => {

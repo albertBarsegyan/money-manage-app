@@ -24,6 +24,33 @@ class TransactionNotificationParserTest {
     }
 
     @Test
+    fun acceptsOnlyNotificationsThatMatchAnEnabledMonitoredCard() {
+        val cards = listOf(
+            MonitoredCardMatch("first", "1234", "USD", true),
+            MonitoredCardMatch("disabled", "9999", "AMD", false),
+            MonitoredCardMatch("no-digits", null, "EUR", true),
+        )
+        val matched = NotificationCardMatcher.resolveAccepted("1234", "USD", cards)
+        assertEquals("first", matched?.cardId)
+        assertEquals("USD", matched?.currency)
+
+        // Currency can come from the monitored card when the notification omits it.
+        assertEquals("USD", NotificationCardMatcher.resolveAccepted("1234", null, cards)?.currency)
+
+        // Unknown, disabled, missing, or ambiguous last-four must be ignored.
+        assertNull(NotificationCardMatcher.resolveAccepted("0000", "USD", cards))
+        assertNull(NotificationCardMatcher.resolveAccepted("9999", "AMD", cards))
+        assertNull(NotificationCardMatcher.resolveAccepted(null, "USD", cards))
+        assertNull(
+            NotificationCardMatcher.resolveAccepted(
+                "1234",
+                "USD",
+                cards + MonitoredCardMatch("duplicate", "1234", "USD", true),
+            ),
+        )
+    }
+
+    @Test
     fun notificationFingerprintSuppressesRepeatedUpdatesInTheSameMinute() {
         val first = duplicateNotificationFingerprint("bank.app", "Purchase", "USD 10.00", 60_001L)
         val update = duplicateNotificationFingerprint("bank.app", "Purchase", "USD 10.00", 119_999L)

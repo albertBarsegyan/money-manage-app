@@ -10,7 +10,7 @@ Run `npm run android:sync`. This rebuilds the static export to `out/` and copies
 
 ## Static export fails on a route
 
-The Android export enumerates route parameters in `src/app/[[...path]]/page.tsx`. Add supported client routes there and ensure the route host has no dependency on Next.js request-time server APIs. The normal web server build and mobile export use different Next.js configurations. Do not add `output: "export"` globally without reviewing web runtime behavior.
+Add a matching `src/app/<route>/page.tsx` for every Android deep-link path, and ensure that page has no dependency on Next.js request-time server APIs. The normal web server build and mobile export use different Next.js configurations. Do not add `output: "export"` globally without reviewing web runtime behavior.
 
 ## Capacitor cannot find the web directory
 

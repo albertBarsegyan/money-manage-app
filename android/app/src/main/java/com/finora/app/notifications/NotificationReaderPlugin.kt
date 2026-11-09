@@ -81,11 +81,13 @@ class NotificationReaderPlugin : Plugin() {
         for (index in 0 until cards.length()) {
             val card = cards.optJSONObject(index) ?: continue
             val lastFour = card.optString("lastFour").takeIf { it.matches(Regex("\\d{4}")) }
+            val accountId = card.optString("accountId").takeIf { it.isNotBlank() }
             safe.put(JSONObject().apply {
                 put("id", card.optString("id"))
                 put("lastFour", lastFour ?: JSONObject.NULL)
                 put("currency", card.optString("currency"))
                 put("monitoringEnabled", card.optBoolean("monitoringEnabled"))
+                put("accountId", accountId ?: JSONObject.NULL)
             })
         }
         val state = store.state().put("cards", safe)
@@ -116,13 +118,25 @@ class NotificationReaderPlugin : Plugin() {
     }
 
     @com.getcapacitor.PluginMethod
+    fun consumeApprovedExpenses(call: PluginCall) {
+        call.resolve(JSObject().put("expenses", store.consumeApprovedExpenses()))
+    }
+
+    @com.getcapacitor.PluginMethod
     fun dismissCandidate(call: PluginCall) {
-        store.dismissCandidate(call.getString("id") ?: "")
+        val id = call.getString("id") ?: ""
+        store.dismissCandidate(id)
+        if (id.isNotBlank()) TransactionReviewNotifier.cancel(context, id)
         call.resolve()
     }
 
     @com.getcapacitor.PluginMethod
     fun clearPendingCandidates(call: PluginCall) {
+        val pending = store.candidates()
+        for (index in 0 until pending.length()) {
+            val id = pending.optJSONObject(index)?.optString("id").orEmpty()
+            if (id.isNotBlank()) TransactionReviewNotifier.cancel(context, id)
+        }
         store.clearCandidates()
         call.resolve()
     }
@@ -154,8 +168,24 @@ class NotificationReaderPlugin : Plugin() {
         @Volatile private var activePlugin: NotificationReaderPlugin? = null
 
         internal fun publish(candidate: JSONObject) {
-            val payload = JSObject.fromJSONObject(candidate)
-            activePlugin?.notifyListeners("transactionDetected", payload)
+            try {
+                activePlugin?.notifyListeners("transactionDetected", JSObject.fromJSONObject(candidate))
+            } catch (_: Exception) {
+                // Listener delivery is best-effort while the WebView is alive.
+            }
+        }
+
+        internal fun publishApproved(expense: JSONObject) {
+            try {
+                activePlugin?.notifyListeners("expenseApproved", JSObject.fromJSONObject(expense))
+            } catch (_: Exception) {
+                // Approval remains queued for consumeApprovedExpenses on resume.
+            }
+        }
+
+        internal fun publishDismissed(candidateId: String) {
+            val payload = JSObject().put("id", candidateId)
+            activePlugin?.notifyListeners("candidateDismissed", payload)
         }
     }
 }

@@ -46,6 +46,8 @@ export interface StorageProvider {
   getNotificationReaderSettings(): NotificationReaderSettings;
   updateNotificationReaderSettings(settings: NotificationReaderSettings): void;
   clearAllData(): void;
+  /** Replace the entire local snapshot. Callers must pass already-validated FinanceData. */
+  replaceAllData(data: FinanceData): void;
 }
 
 export interface FutureStorageProvider extends StorageProvider {

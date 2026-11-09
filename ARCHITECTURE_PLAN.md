@@ -2,6 +2,8 @@
 
 ## 1. Current architecture overview
 
+> Historical baseline (pre-migration). Current state is documented in §14.
+
 Finora is a Next.js 16 App Router application using React 19 and strict TypeScript. The Next `app/` directory currently has one route (`/`), a root layout, global CSS, and a client-side provider. The only navigation is an internal `View` state in `app/page.tsx`; screens do not have distinct URLs or browser-history entries.
 
 Financial state is exposed through `FinanceProvider` and a `FinanceSession` context. `StorageManager` selects an IndexedDB local provider by default. That provider hydrates a memory cache, persists snapshots through an IndexedDB transaction queue, and uses `BroadcastChannel` for updates across open tabs. Core calculations are pure TypeScript and use integer minor units. There are no active server APIs, authentication flows, or external financial connections. `src/server/integrations/` is isolated future scaffolding and is not called from the UI.
@@ -31,12 +33,12 @@ The TypeScript alias `@/*` currently maps to the repository root. ESLint 9 flat 
 | --- | --- |
 | Framework and runtime | `next@16.4.5`, `react@19.3.0`, `react-dom@19.3.0` |
 | Language | `typescript@5.9.3`, strict mode |
-| Routing | Next App Router for `/`; internal state for the seven finance sections |
+| Routing | Next App Router filesystem routes for all finance sections (see §14) |
 | Styling | One global CSS file, custom class selectors and a small root token set; Tailwind 4 is installed but not configured or used by the interface |
 | Forms | Native controlled fields and `useState`; validation is partly HTML-required and partly inline submit guards; domain validation lives separately in `src/core/finance/validation.ts` |
 | State and persistence | React context + `useSyncExternalStore`; IndexedDB is the active local provider; no remote API or auth |
 | Tests and build | Node test runner driven by TypeScript compilation; Next production build |
-| Not present | TanStack Router, shadcn components, Motion, React Hook Form, Zod, Lucide, next-themes |
+| Not present historically | shadcn components, Motion, React Hook Form, Zod, Lucide, next-themes (routing is Next.js App Router only) |
 
 ## 4. Identified architectural problems
 
@@ -52,7 +54,7 @@ The TypeScript alias `@/*` currently maps to the repository root. ESLint 9 flat 
 
 ## 5. Proposed architecture
 
-Keep Next.js as the existing application host and use TanStack Router as the client-side, type-safe route owner. Next treats `src/pages/` as its legacy Pages Router, so FSD page slices live in `src/fsd/pages/` to avoid Next interpreting components as route entries. Next's App Router host moves to `src/app/`; it remains responsible for the document, metadata, global CSS and server/client boundary. A minimal optional catch-all Next route mounts the client router so direct visits to supported TanStack paths still receive the application shell. This is an intentional bridge: TanStack Router does not provide a Next.js framework adapter, and the official CLI route generator is the compatible choice when the active bundler has no supported TanStack plugin.
+Use Next.js App Router as the only routing solution. Next treats `src/pages/` as its legacy Pages Router, so FSD page slices live in `src/fsd/pages/` to avoid Next interpreting components as route entries. `src/app/` owns the document, metadata, global CSS, providers, and filesystem routes. Client navigation uses `next/link` and `next/navigation`. Capacitor Android consumes a static export of these same App Router pages.
 
 Move Next's App Router into `src/app/`; this also serves as the FSD app layer for providers, global styles, and configuration. Keep domain calculations independent of UI, router and storage. Give each slice a public `index.ts`; enforce import direction with ESLint boundaries where the rule can be applied without misclassifying the Next adapter.
 
@@ -60,21 +62,22 @@ Move Next's App Router into `src/app/`; this also serves as the FSD app layer fo
 
 ```text
 src/
-  app/                                 # Next.js host + FSD application layer
+  app/                                 # Next.js App Router + FSD application layer
     layout.tsx
-    [[...path]]/page.tsx               # Mounts the TanStack client application
-    providers/                         # Finance, theme and router providers
+    page.tsx                           # Overview
+    transactions/page.tsx
+    income/page.tsx
+    accounts/page.tsx
+    salary-periods/page.tsx
+    analytics/page.tsx
+    integrations/page.tsx
+    settings/page.tsx
+    error.tsx
+    loading.tsx
+    not-found.tsx
+    providers/                         # Finance, theme and native providers
     styles/                            # Tokens and Tailwind/shadcn global styles
     config/
-  routes/                              # TanStack file routes + generated route tree
-    __root.tsx
-    index.tsx
-    income.tsx
-    transactions.tsx
-    accounts.tsx
-    analytics.tsx
-    integrations.tsx
-    settings.tsx
   fsd/pages/                           # FSD page layer (src/pages is reserved by Next)
     overview/                          # Screen composition
     income/
@@ -114,13 +117,13 @@ The names above are targets, not a mandate to create empty folders. Each slice w
 
 ## 6. Routing migration strategy
 
-1. Add `@tanstack/react-router` and `@tanstack/router-cli`; use `tsr generate` before dev/build and a route watcher during development. Store routes under `src/routes` and the generated tree at `src/routeTree.gen.ts`.
-2. Keep route modules lightweight. Each route imports a screen only through a page slice public API. The root route renders the shared app shell with an `Outlet`; child routes render one page each.
-3. Replace internal `View` buttons with TanStack `Link` navigation and `useRouterState` active state. Preserve `/` as Overview. Introduce readable paths for the other existing sections (`/transactions`, `/income`, `/accounts`, `/analytics`, `/integrations`, `/settings`). Search/filter text will use validated router search state only if retaining it in a URL benefits the user; otherwise it remains local UI state.
-4. Add router pending, error, and not-found components. Route-level lazy loading and generated route chunk splitting will be enabled where the CLI/runtime combination supports it.
-5. Validate direct loads and refreshes through Next's optional catch-all. Do not add duplicate Next pages for every TanStack route.
+1. Use Next.js App Router filesystem routes under `src/app/` as the only router.
+2. Keep route modules lightweight. Each `page.tsx` mounts the shared finance shell through a page-slice public API.
+3. Use `next/link`, `usePathname`, `useRouter`, and `useSearchParams` for navigation and search state. Preserve `/` as Overview and readable paths for `/transactions`, `/income`, `/accounts`, `/salary-periods`, `/analytics`, `/integrations`, and `/settings`.
+4. Provide App Router `loading.tsx`, `error.tsx`, and `not-found.tsx`.
+5. For Capacitor, statically export the same App Router pages with `output: "export"` and trailing slashes.
 
-Compatibility risk: TanStack Router officially targets React and supported client bundlers, not a Next framework adapter. The app therefore keeps Next as a host and uses the documented router CLI generator (which generates route types/tree, but does not provide bundler integrations). The client router bridge needs production-build and browser refresh validation before removing the existing page.
+TanStack Router is not part of the architecture.
 
 ## 7. Component migration strategy
 
@@ -155,7 +158,7 @@ Keep `FinanceProvider` and the storage abstraction while moving them to the FSD 
 1. Complete this assessment and plan before app changes.
 2. Install compatible router, UI, motion, theme, and form dependencies; add Tailwind v4/shadcn aliases and scripts.
 3. Establish FSD entity/page/widget/feature/shared public APIs and move pure finance code into entities without changing behavior.
-4. Add TanStack file routes, generated route tree, Next host bridge, route errors/loading/not-found, and URL navigation.
+4. Add Next.js App Router filesystem routes, route errors/loading/not-found, and URL navigation.
 5. Extract the app shell and each page from the monolith, preserving actions and empty states.
 6. Add shadcn primitives and semantic tokens; migrate shared controls and dialogs.
 7. Migrate all four data forms to React Hook Form/Zod and shared accessible fields.
@@ -165,7 +168,7 @@ Keep `FinanceProvider` and the storage abstraction while moving them to the FSD 
 
 ## 12. Potential compatibility and data risks
 
-- TanStack Router under Next is a client-router bridge, not an official Next adapter. Deep links and refresh behavior must be exercised against the catch-all host route.
+- Android deep links and refresh behavior must be exercised against the exported App Router HTML files under `out/`.
 - Next 16 Cache Components, static prerendering and client-only IndexedDB hydration can surface hydration or boundary errors; preserve the current empty server snapshot until hydration completes.
 - Tailwind v4/shadcn setup differs from older Tailwind config conventions; use the official v4 PostCSS and CSS import setup, not the obsolete Turbopack loader.
 - `next-themes` uses a small browser preference store and pre-hydration script; verify it does not interfere with the app's root markup and test both explicit and system themes.
@@ -176,8 +179,8 @@ Keep `FinanceProvider` and the storage abstraction while moving them to the FSD 
 ## 13. Documentation references consulted
 
 - [Next.js Server and Client Components](https://nextjs.org/docs/app/getting-started/server-and-client-components)
-- [TanStack Router file-based routing](https://tanstack.com/router/latest/docs/routing/file-based-routing)
-- [TanStack Router CLI route generation](https://tanstack.com/router/latest/docs/installation/with-router-cli)
+- [Next.js App Router](https://nextjs.org/docs/app)
+- [Next.js static exports](https://nextjs.org/docs/app/guides/static-exports)
 - [shadcn/ui Next.js installation](https://ui.shadcn.com/docs/installation/next)
 - [shadcn/ui Tailwind v4](https://ui.shadcn.com/docs/tailwind-v4)
 - [Motion for React installation](https://motion.dev/docs/react-installation)
@@ -189,9 +192,7 @@ The plan was completed before implementation began. The following parts are now 
 
 ```text
 src/
-  app/                         # Next host, root layout, providers, tokens and CSS
-  routes/                      # TanStack file routes and root error/not-found handling
-  routeTree.gen.ts             # CLI-generated route registration
+  app/                         # Next App Router pages, layout, providers, tokens and CSS
   fsd/pages/finance/           # Finance screens and route-level composition
   features/
     finance-session/           # Storage-backed finance context
@@ -209,25 +210,26 @@ src/
 
 Implementation details:
 
-- The existing Next App Router remains the document/build host. Its files moved to `src/app`; a Next optional catch-all mounts TanStack Router. `/` remains Overview, with routes for income, transactions, accounts, analytics, integrations, and settings. Transaction search uses validated route search parameters. The generated route tree is refreshed before dev and production builds.
+- Next.js App Router is the only router. `/` remains Overview, with routes for income, transactions, accounts, salary periods, analytics, integrations, and settings. Transaction search uses Next.js search parameters.
 - FSD layer dependencies are checked with `eslint-plugin-boundaries`. Cross-slice imports use public `index.ts` APIs. The finance storage implementation moved under the finance entity so the shared layer does not depend on domain models.
 - Tailwind CSS v4 and shadcn New York/Radix conventions are configured. Shared primitives include alert dialog, badge, button, card, dialog, dropdown menu, input, select, textarea, tooltip, toast, and reusable record-form wrappers. Existing page styles were retained and supplemented with semantic light/dark tokens and dark-mode overrides.
 - Motion route presets and `MotionConfig` respect reduced-motion preferences. Theme selection supports light, dark, and system through `next-themes`.
 - Income, transactions, accounts, and salary-period forms use React Hook Form, feature-local Zod schemas, shared field/dialog wrappers, and field errors. Imported income transactions remain editable, and the budget engine treats confirmed transaction income as inflow rather than expense.
 - The existing IndexedDB finance store, memory cache, manual data entry, empty states, CSV review, and local calculations remain active. No fake provider connection was added.
 
-Verification on 2026-11-07:
+Verification on 2026-11-09 (App Router-only migration):
 
-- `npm run format` — passed.
+- TanStack Router packages, `src/routes/`, `routeTree.gen.ts`, `tsr.config.json`, and the Next catch-all host were removed.
 - `npm run lint` — passed with no diagnostics.
 - `npm run typecheck` — passed.
-- `npm test` — passed, 12 tests.
-- `npm run generate-routes && npx next build --webpack` — passed. Default Turbopack build could not bind a helper process in this environment, including after escalation; the supported Webpack build completed successfully.
+- `npm test` — passed, 33 tests.
+- `npm run build` — passed with Webpack; App Router static pages for `/`, `/transactions`, `/income`, `/accounts`, `/salary-periods`, `/analytics`, `/integrations`, `/settings`.
+- `npm run android:sync` and `npm run android:build:debug` — passed against the Capstatic export (`trailingSlash` HTML under `out/`).
 
 Remaining scope and limitations:
 
 - The FSD layers and dependency direction are established, but all seven screens and much of the application shell still live in `src/fsd/pages/finance/ui/finance-workspace.tsx`. The proposed per-page/widget extraction is not complete, and page-level code splitting has not been added.
-- The Next-to-TanStack client-router bridge builds, but no real browser/device viewport or deep-link interaction session was run here. Responsive styles and route definitions were verified by source/build checks only.
+- App Router pages and static export build, but no real browser/device viewport or deep-link interaction session was run here. Responsive styles and route definitions were verified by source/build checks only.
 - Loading UI is limited to framework/router defaults; dedicated route-specific loading skeletons and lazy route chunks are future work.
 - shadcn components are available in shared UI, but several legacy screen controls still use the preserved custom CSS/native markup. The full visual migration and accessible interaction audit are not complete.
 - Existing automated tests cover the financial domain, local storage/privacy source checks, CSV, and notification candidate boundary. They do not provide browser-level tests for themes, mobile navigation, forms, animations, or route behavior.

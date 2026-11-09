@@ -22,7 +22,7 @@ Use **Settings → Data & Privacy → Clear Local Data** to permanently clear Fi
 - `src/entities/finance/storage/providers/planned-storage.provider.ts` marks Private Cloud and Custom Database as unavailable. They cannot be selected or used to migrate data.
 - `src/entities/finance/storage/storage-manager.ts` owns provider selection and rejects unavailable modes.
 - `src/features/finance-session` exposes finance data through an application context; UI components do not choose storage providers. IndexedDB hydrates once, maintains a memory cache for synchronous calculations, and serializes atomic snapshots through a write queue.
-- `src/routes` contains generated TanStack Router file routes. `src/app` hosts Next.js and mounts the client router through an optional catch-all route.
+- `src/app` hosts the Next.js App Router (`page.tsx` per route). Client navigation uses `next/link` and `next/navigation`.
 - `src/features/manage-*` owns the four finance forms and Zod schemas. `src/shared/ui` contains shadcn primitives and accessible form/dialog wrappers.
 - `src/server/integrations` contains isolated future integration/security primitives. No route, provider connection, credentials, webhook, or sync job is active in the application.
 

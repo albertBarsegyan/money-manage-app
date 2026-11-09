@@ -1,16 +1,8 @@
 package com.finora.app.notifications
 
 import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.content.Intent
-import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import androidx.core.app.NotificationCompat
-import com.finora.app.MainActivity
-import com.finora.app.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -34,58 +26,29 @@ class TransactionNotificationListener : NotificationListenerService() {
         if (title.isBlank() && text.isBlank()) return
 
         val parsed = TransactionNotificationParser.parse(title, text) ?: return
-        val cardId = store.matchingCard(parsed.lastFour)
-        val currency = parsed.currency ?: store.matchingCardCurrency(parsed.lastFour) ?: return
+        // Drop anything that does not uniquely match an enabled card from the user's list.
+        val accepted = store.resolveAcceptedCard(parsed.lastFour, parsed.currency) ?: return
         val timestamp = statusBarNotification.postTime.takeIf { it > 0L } ?: System.currentTimeMillis()
         val candidate = parsed.copy(
-            id = stableHash("$packageName|${parsed.amountMinor}|$currency|${parsed.merchant.lowercase(Locale.ROOT)}|${timestamp / 60_000L}"),
+            id = stableHash("$packageName|${parsed.amountMinor}|${accepted.currency}|${parsed.merchant.lowercase(Locale.ROOT)}|${timestamp / 60_000L}"),
             packageName = packageName,
-            currency = currency,
+            currency = accepted.currency,
             occurredAt = formatUtc(timestamp),
-            cardId = cardId,
+            cardId = accepted.cardId,
         )
         val dedupeKey = duplicateNotificationFingerprint(packageName, title, text, timestamp)
         if (!store.acceptCandidate(candidate.toJson(), dedupeKey)) return
 
-        NotificationReaderPlugin.publish(candidate.toJson())
-        if (!appIsForeground()) showReviewNotification()
-    }
-
-    private fun appIsForeground(): Boolean {
-        val manager = getSystemService(ACTIVITY_SERVICE) as android.app.ActivityManager
-        val current = manager.runningAppProcesses ?: return false
-        return current.any { it.processName == packageName && it.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND }
-    }
-
-    private fun showReviewNotification() {
-        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            manager.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Transaction review", NotificationManager.IMPORTANCE_DEFAULT),
-            )
-        }
-        val intent = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        val pending = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("Transaction detected")
-            .setContentText("Tap to review and confirm it in Finora.")
-            .setContentIntent(pending)
-            .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .build()
-        manager.notify(REVIEW_NOTIFICATION_ID, notification)
+        val payload = candidate.toJson()
+        NotificationReaderPlugin.publish(payload)
+        // Always post an actionable review notification so background / recents users can approve.
+        TransactionReviewNotifier.show(applicationContext, payload)
     }
 
     private fun formatUtc(timestamp: Long): String = SimpleDateFormat(
         "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
         Locale.ROOT,
     ).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(Date(timestamp))
-
-    companion object {
-        private const val CHANNEL_ID = "transaction-review"
-        private const val REVIEW_NOTIFICATION_ID = 9137
-    }
 }
 
 internal data class ParsedNotification(

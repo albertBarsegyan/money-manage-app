@@ -22,7 +22,7 @@ export class IndexedDbStorageProvider implements StorageProvider {
     inMemory: false,
     persistent: true,
     synchronization: false,
-    importExport: false,
+    importExport: true,
     available: true,
   };
   private readonly cache = new MemoryStorageProvider();
@@ -152,6 +152,10 @@ export class IndexedDbStorageProvider implements StorageProvider {
   }
   clearAllData() {
     this.cache.clearAllData();
+    this.persist();
+  }
+  replaceAllData(data: FinanceData) {
+    this.cache.replaceAllData(data);
     this.persist();
   }
 

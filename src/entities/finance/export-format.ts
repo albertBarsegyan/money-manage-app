@@ -5,6 +5,7 @@ import type {
   IncomeRecord,
   SalaryPeriod,
 } from "./models";
+import { emptyFinanceData } from "./models";
 import {
   validateAccount,
   validateExpense,
@@ -26,25 +27,68 @@ export interface ImportPreview {
   errors: string[];
 }
 
+export interface FinanceDataCounts {
+  income: number;
+  expenses: number;
+  accounts: number;
+  salaryPeriods: number;
+  monitoredCards: number;
+  total: number;
+}
+
 /** Pure envelope creation. Calling this function does not write a file or persist the data. */
 export function createExportEnvelope(data: FinanceData, exportedAt: string): FinoraExportV1 {
   return { format: "finora-export", version: 1, exportedAt, data: cloneFinanceData(data) };
 }
 
+/** Compact single-file JSON suitable for download/backup. Does not write a file. */
+export function serializeExport(data: FinanceData, exportedAt: string): string {
+  return JSON.stringify(createExportEnvelope(data, exportedAt));
+}
+
+/** Parse a Finora export file and validate it as a full replace snapshot. Never mutates storage. */
+export function parseExportText(text: string): ImportPreview {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text) as unknown;
+  } catch {
+    return emptyPreview(["The file is not valid JSON."]);
+  }
+  return previewReplaceImport(raw);
+}
+
+/** Validate untrusted JSON as a complete replace snapshot (self-contained, not a merge). */
+export function previewReplaceImport(raw: unknown): ImportPreview {
+  return previewImport(raw, emptyFinanceData());
+}
+
+export function countFinanceRecords(data: FinanceData): FinanceDataCounts {
+  const income = data.income.length;
+  const expenses = data.expenses.length;
+  const accounts = data.accounts.length;
+  const salaryPeriods = data.salaryPeriods.length;
+  const monitoredCards = data.monitoredCards.length;
+  return {
+    income,
+    expenses,
+    accounts,
+    salaryPeriods,
+    monitoredCards,
+    total: income + expenses + accounts + salaryPeriods + monitoredCards,
+  };
+}
+
+function emptyPreview(errors: string[] = []): ImportPreview {
+  return {
+    records: emptyFinanceData(),
+    duplicates: [],
+    errors,
+  };
+}
+
 /** Validate untrusted imported JSON into a preview. This function never mutates a provider. */
 export function previewImport(raw: unknown, existing: FinanceData): ImportPreview {
-  const empty = (): ImportPreview => ({
-    records: {
-      income: [],
-      expenses: [],
-      accounts: [],
-      salaryPeriods: [],
-      monitoredCards: [],
-      notificationReader: { enabled: false, selectedPackages: [] },
-    },
-    duplicates: [],
-    errors: [],
-  });
+  const empty = () => emptyPreview();
   if (
     !isObject(raw) ||
     raw.format !== "finora-export" ||

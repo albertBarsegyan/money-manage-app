@@ -7,6 +7,8 @@ export {
 } from "./android-notifications";
 export {
   notificationReader,
+  toExpenseRecord,
+  type ApprovedNotificationExpense,
   type DetectedTransaction,
   type InstalledReaderApp,
   type NotificationReaderStatus,

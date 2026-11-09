@@ -104,6 +104,9 @@ export class PlannedStorageProvider implements FutureStorageProvider {
   clearAllData(): void {
     return unavailable();
   }
+  replaceAllData(_data: FinanceData): void {
+    return unavailable();
+  }
 }
 
 function unavailable(): never {

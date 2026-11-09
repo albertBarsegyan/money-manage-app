@@ -23,7 +23,7 @@ export class MemoryStorageProvider implements StorageProvider {
     inMemory: true,
     persistent: false,
     synchronization: false,
-    importExport: false,
+    importExport: true,
     available: true,
   };
   private data: FinanceData = emptyFinanceData();

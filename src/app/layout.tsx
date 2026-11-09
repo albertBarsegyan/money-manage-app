@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
-import type { Viewport } from "next";
+import type { ReactNode } from "react";
+import type { Metadata, Viewport } from "next";
 import "./styles/globals.css";
 import { AppProviders } from "./providers/index";
 
@@ -22,7 +22,7 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <body>

@@ -78,12 +78,69 @@ internal class NotificationReaderStore(context: Context) {
         save(value)
     }
 
+    fun findCandidate(id: String): JSONObject? {
+        val current = state().optJSONArray("candidates") ?: return null
+        for (index in 0 until current.length()) {
+            val item = current.optJSONObject(index) ?: continue
+            if (item.optString("id") == id) return item
+        }
+        return null
+    }
+
+    /** Move a pending candidate into the approved queue for WebView/IndexedDB sync. */
+    @Synchronized
+    fun approveCandidate(candidateId: String, budgetMode: String): JSONObject? {
+        val candidate = findCandidate(candidateId) ?: return null
+        val expense = ApprovedExpenseFactory.fromCandidate(
+            candidate,
+            budgetMode,
+            accountIdForCard(candidate.optString("cardId").takeIf { it.isNotBlank() }),
+        ) ?: return null
+        val value = state()
+        val candidates = value.optJSONArray("candidates") ?: JSONArray()
+        val retained = JSONArray()
+        for (index in 0 until candidates.length()) {
+            val item = candidates.optJSONObject(index) ?: continue
+            if (item.optString("id") != candidateId) retained.put(item)
+        }
+        val approved = value.optJSONArray("approved") ?: JSONArray()
+        // Replace any earlier approval for the same external reference.
+        val nextApproved = JSONArray()
+        for (index in 0 until approved.length()) {
+            val item = approved.optJSONObject(index) ?: continue
+            if (item.optString("externalReference") != candidateId) nextApproved.put(item)
+        }
+        nextApproved.put(expense)
+        value.put("candidates", retained)
+        value.put("approved", nextApproved)
+        save(value)
+        return expense
+    }
+
+    @Synchronized
+    fun consumeApprovedExpenses(): JSONArray {
+        val value = state()
+        val approved = value.optJSONArray("approved") ?: JSONArray()
+        value.put("approved", JSONArray())
+        save(value)
+        return approved
+    }
+
     fun matchingCard(lastFour: String?): String? {
         return NotificationCardMatcher.matchCardId(lastFour, monitoredCardMatches())
     }
 
     fun matchingCardCurrency(lastFour: String?): String? {
         return NotificationCardMatcher.matchCurrency(lastFour, monitoredCardMatches())
+    }
+
+    fun resolveAcceptedCard(lastFour: String?, parsedCurrency: String?): AcceptedCardMatch? {
+        return NotificationCardMatcher.resolveAccepted(lastFour, parsedCurrency, monitoredCardMatches())
+    }
+
+    fun accountIdForCard(cardId: String?): String? {
+        if (cardId.isNullOrBlank()) return null
+        return monitoredCardMatches().firstOrNull { it.id == cardId }?.accountId
     }
 
     private fun monitoredCardMatches(): List<MonitoredCardMatch> {
@@ -94,8 +151,17 @@ internal class NotificationReaderStore(context: Context) {
             val id = card.optString("id")
             val lastFour = card.optString("lastFour").takeIf { it.isNotBlank() }
             val currency = card.optString("currency")
+            val accountId = card.optString("accountId").takeIf { it.isNotBlank() }
             if (id.isNotBlank() && currency.isNotBlank())
-                matches.add(MonitoredCardMatch(id, lastFour, currency, card.optBoolean("monitoringEnabled")))
+                matches.add(
+                    MonitoredCardMatch(
+                        id,
+                        lastFour,
+                        currency,
+                        card.optBoolean("monitoringEnabled"),
+                        accountId,
+                    ),
+                )
         }
         return matches
     }

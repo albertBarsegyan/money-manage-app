@@ -4,10 +4,10 @@ import type {
   MonitoredCardRecord,
   NotificationReaderSettings,
   SalaryPeriod,
+  StorageMode,
 } from "@/entities/finance";
 import type { DetectedTransaction } from "@/features/integrations";
 import { NotificationReaderPanel } from "@/features/integrations";
-import type { StorageMode } from "@/entities/finance";
 import { displayDate, Icon } from "./finance-page-shared";
 
 export function SettingsPage({
@@ -21,6 +21,8 @@ export function SettingsPage({
   recentReaderTransactions,
   onMode,
   onClear,
+  onExport,
+  onImport,
   onSalary,
   onEditSalary,
   onDeleteSalary,
@@ -50,6 +52,8 @@ export function SettingsPage({
   recentReaderTransactions: ExpenseRecord[];
   onMode: (mode: StorageMode) => void;
   onClear: () => void;
+  onExport: () => void;
+  onImport: (file?: File) => void;
   onSalary: () => void;
   onEditSalary: (period: SalaryPeriod) => void;
   onDeleteSalary: (period: SalaryPeriod) => void;
@@ -60,6 +64,9 @@ export function SettingsPage({
   onReviewDetectedTransaction: (candidate: DetectedTransaction) => void;
   onDismissDetectedTransaction: (candidate: DetectedTransaction) => void;
 }) {
+  const canImportExport = providers.some(
+    (provider) => provider.id === mode && provider.capabilities.importExport,
+  );
   return (
     <div className="settings-stack">
       <NotificationReaderPanel
@@ -208,12 +215,41 @@ export function SettingsPage({
           </span>
           <div>
             <h2>Portability</h2>
-            <p>Versioned import/export and cross-provider migration.</p>
+            <p>Backup and restore everything in one compact JSON file.</p>
           </div>
         </div>
-        <div className="future-note">
-          Export, import preview, record validation, duplicate detection and migration are planned
-          for a future storage release. No automatic backups are created.
+        <div className="portability-actions">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={onExport}
+            disabled={!canImportExport}
+          >
+            Export JSON
+          </button>
+          <label
+            className={`secondary-button import-button${canImportExport ? "" : " is-disabled"}`}
+          >
+            Import JSON
+            <input
+              type="file"
+              accept="application/json,.json"
+              disabled={!canImportExport}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                onImport(file);
+                event.target.value = "";
+              }}
+            />
+          </label>
+        </div>
+        <div className="storage-explainer">
+          <b>How restore works</b>
+          <p>
+            Export downloads your full local snapshot (income, transactions, accounts, salary
+            periods, monitored cards, and reader settings). Import validates the file, then replaces
+            the data on this device so every screen stays in sync. No automatic backups are created.
+          </p>
         </div>
       </section>
     </div>

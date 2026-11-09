@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 120 120" role="img" aria-label="Finora">
+    <style>
+        .round-left { transform-box: fill-box; transform-origin: center; animation: move-left 1.8s ease-in-out infinite; }
+        .round-right { transform-box: fill-box; transform-origin: center; animation: move-right 1.8s ease-in-out infinite; }
+        @keyframes move-left { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(5px); } }
+        @keyframes move-right { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-5px); } }
+        @media (prefers-reduced-motion: reduce) { .round-left, .round-right { animation: none; } }
+    </style>
+    <rect width="120" height="120" rx="28" fill="#6b5ce7"/>
+    <circle class="round-left" cx="47" cy="60" r="27" fill="#ffffff"/>
+    <circle class="round-right" cx="73" cy="60" r="27" fill="#ffffff" fill-opacity="0.55"/>
+</svg>

@@ -41,6 +41,10 @@ import {
   ReaderTransactionDialog,
   type DetectedTransaction,
 } from "@/features/integrations";
+import Image from "next/image";
+import icon from '@/shared/assets/icon.svg';
+import financeIcon from "@/shared/assets/icon.svg";
+
 
 type Dialog = "income" | "expense" | "account" | "salary" | "reader" | null;
 const viewPaths = {
@@ -381,15 +385,10 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
         />
       )}
       <aside className={`sidebar${mobileNavOpen ? " mobile-open" : ""}`}>
-        <div className="brand">
-          <div className="brand-mark" aria-hidden="true">
-            f
-          </div>
-          <span>finora</span>
-          <span className="brand-dot" aria-hidden="true">
-            .
-          </span>
-        </div>
+        <Link href='/' className="brand gap-2">
+          <Image src={icon} alt="" width={30} height={30} />
+          <span className='text-white hidden lg:block'>Finora</span>
+        </Link>
         <div className="workspace-label">FINANCIAL SPACE</div>
         <nav id="main-navigation" className="nav-list" aria-label="Main navigation">
           {nav.map(([item, icon, path]) => (
@@ -706,6 +705,25 @@ export function FinanceWorkspace({ view: routeView }: { view?: View } = {}) {
             </motion.div>
           </AnimatePresence>
         </div>
+        <footer className="app-footer">
+          <p className="app-footer-credit">
+            <span>Made with care by</span>
+            <a href="https://neolabsagency.com" target="_blank" rel="noopener noreferrer">
+              Neo Labs Agency
+            </a>
+          </p>
+          <nav className="app-footer-links" aria-label="Agency contact links">
+            <a href="tel:+37494770713">+374 94 770713</a>
+            <a href="mailto:neo.labs.agency@gmail.com">neo.labs.agency@gmail.com</a>
+            <a
+              href="https://www.instagram.com/neo.labs.agency/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Instagram
+            </a>
+          </nav>
+        </footer>
       </main>
       {error && (
         <div className="toast error-toast" role="alert">

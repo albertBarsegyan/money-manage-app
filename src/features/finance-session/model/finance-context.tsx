@@ -9,6 +9,8 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import Image from "next/image";
+import financeIcon from "@/shared/assets/icon.svg";
 import type {
   AccountRecord,
   ExpenseRecord,
@@ -153,23 +155,23 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   if (!ready)
     return (
       <StorageStatus
-        title="Opening your local data"
-        detail="Finora is preparing your private workspace on this device."
+        title="Getting Finora ready"
+        detail="Your private money workspace is loading on this device."
         loading
       />
     );
   if (storageError)
     return (
       <StorageStatus
-        title="Local data is unavailable"
-        detail={`Finora could not open this browser’s IndexedDB: ${storageError}`}
+        title="We couldn’t open your local data"
+        detail={`Finora couldn’t access this browser’s storage: ${storageError}`}
       />
     );
   if (effectiveError)
     return (
       <StorageStatus
-        title="Your last change could not be saved"
-        detail={`${effectiveError} Check browser storage availability, then reload Finora.`}
+        title="Your latest change wasn’t saved"
+        detail={`${effectiveError} Check your browser storage, then reload Finora.`}
       />
     );
   return <FinanceContext.Provider value={value}>{children}</FinanceContext.Provider>;
@@ -195,13 +197,13 @@ function StorageStatus({
           className={`storage-gate-mark${loading ? " is-loading" : " is-error"}`}
           aria-hidden="true"
         >
-          {loading ? <span /> : <b>!</b>}
+          {loading ? <Image src={financeIcon} alt="" width={60} height={60} /> : <b>!</b>}
         </div>
         <div className="storage-gate-brand">FINORA</div>
         <h1>{title}</h1>
         <p>{detail}</p>
         {loading && (
-          <span className="storage-gate-footnote">Local-only storage · No cloud connection</span>
+          <span className="storage-gate-footnote">Your data stays on this device</span>
         )}
       </section>
     </main>

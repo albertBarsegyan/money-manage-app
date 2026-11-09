@@ -1,6 +1,5 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -195,7 +194,8 @@
 .storage-gate{min-height:100svh;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at 50% 38%,#f0edff 0%,#f8f8fb 46%,#f7f8fa 100%)}
 .storage-gate-card{width:min(100%,440px);display:flex;flex-direction:column;align-items:center;text-align:center;padding:46px 42px 40px;background:rgba(255,255,255,.9);border:1px solid #eceaf5;border-radius:22px;box-shadow:0 24px 70px #36305212,0 3px 12px #36305208;backdrop-filter:blur(12px);animation:storage-gate-enter .35s ease-out both}
 .storage-gate-mark{width:60px;height:60px;display:grid;place-items:center;margin-bottom:24px;border-radius:20px;background:#f0eefc;color:#6b5ce7}
-.storage-gate-mark.is-loading span{width:23px;height:23px;border:2px solid #d9d3fb;border-top-color:#6b5ce7;border-radius:50%;animation:storage-gate-spin .8s linear infinite}
+.storage-gate-mark.is-loading{background:transparent}
+.storage-gate-mark.is-loading img{width:60px;height:60px}
 .storage-gate-mark.is-error{background:#fff0ee;color:#bd5a53;font-size:25px}
 .storage-gate-mark.is-error b{font-weight:650}
 .storage-gate-brand{font-size:10px;font-weight:750;letter-spacing:2px;color:#7770b4}
@@ -219,6 +219,18 @@
 .dark .pwa-install-button{border-color:var(--border);background:var(--card);color:var(--foreground)}
 .dark .pwa-install-button:hover{background:var(--muted);color:var(--foreground)}
 .dark .pwa-offline-indicator{color:#f0bd83}
+
+.app-footer{width:100%;max-width:1300px;margin:0 auto;padding:20px 48px 25px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:18px;color:var(--muted-foreground);font-size:11px}
+.app-footer-credit{display:flex;align-items:center;gap:5px;margin:0;white-space:nowrap}
+.app-footer-credit a{color:var(--foreground);font-weight:650;text-decoration:none;transition:color .18s ease}
+.app-footer-credit a:hover,.app-footer-links a:hover{color:var(--primary)}
+.app-footer-links{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:8px}
+.app-footer-links a{display:inline-flex;align-items:center;min-height:30px;padding:0 10px;border:1px solid var(--line);border-radius:999px;background:color-mix(in srgb,var(--card) 78%,transparent);color:var(--muted-foreground);text-decoration:none;transition:color .18s ease,border-color .18s ease,background-color .18s ease}
+.app-footer-links a:hover{border-color:color-mix(in srgb,var(--primary) 35%,var(--line));background:var(--accent)}
+.dark .app-footer-credit a{color:var(--foreground)}
+@media(max-width:1100px){.app-footer{padding-left:28px;padding-right:28px}}
+@media(max-width:760px){.app-footer{align-items:flex-start;flex-direction:column;padding:17px 16px 22px;gap:12px}.app-footer-links{justify-content:flex-start;gap:7px}.app-footer-links a{min-height:29px;padding:0 9px;font-size:10px}}
+@media(max-width:390px){.app-footer{padding-left:11px;padding-right:11px}.app-footer-links{gap:6px}.app-footer-links a{padding:0 8px}}
 
 /* Keep decorative icons distinct from their backgrounds in dark mode. */
 .dark .quick-icon.purple,
@@ -327,10 +339,9 @@
   color: var(--muted-foreground);
 }
 
-@keyframes storage-gate-spin{to{transform:rotate(360deg)}}
 @keyframes storage-gate-enter{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:480px){.storage-gate-card{padding:38px 23px 32px;border-radius:18px}.storage-gate-card h1{font-size:20px}.storage-gate-card p{font-size:12px}}
-@media(prefers-reduced-motion:reduce){.storage-gate-card{animation:none}.storage-gate-mark.is-loading span{animation-duration:2s}}
+@media(prefers-reduced-motion:reduce){.storage-gate-card{animation:none}}
 
 @media(max-width:390px){
   .quick-action-list{width:calc(100% + 22px);margin-inline:-11px;padding-inline:11px}

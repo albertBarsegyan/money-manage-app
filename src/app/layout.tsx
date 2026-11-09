@@ -14,13 +14,6 @@ export const metadata: Metadata = {
     title: "Finora",
   },
   formatDetection: { telephone: false },
-  icons: {
-    icon: [
-      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
-      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
-    ],
-    apple: "/icon-192.png",
-  },
 };
 
 export const viewport: Viewport = {

@@ -1,7 +1,12 @@
-const VERSION = "finora-v1";
+const VERSION = "finora-v2";
 const PAGE_CACHE = `${VERSION}-pages`;
 const ASSET_CACHE = `${VERSION}-assets`;
-const APP_SHELL = ["/", "/offline.html", "/icon-192.png", "/icon-512.png"];
+const APP_SHELL = [
+  "/",
+  "/offline.html",
+  "/favicon-for-public/web-app-manifest-192x192.png",
+  "/favicon-for-public/web-app-manifest-512x512.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -78,8 +83,8 @@ self.addEventListener("fetch", (event) => {
   const isPublicPwaAsset =
     url.pathname === "/manifest.webmanifest" ||
     url.pathname === "/icon.svg" ||
-    url.pathname === "/icon-192.png" ||
-    url.pathname === "/icon-512.png";
+    url.pathname === "/favicon-for-public/web-app-manifest-192x192.png" ||
+    url.pathname === "/favicon-for-public/web-app-manifest-512x512.png";
   if (!isVersionedAsset && !isPublicPwaAsset) return;
 
   event.respondWith(
